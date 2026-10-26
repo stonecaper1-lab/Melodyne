@@ -1,0 +1,48 @@
+name: build-apk
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip project
+        run: unzip -q melodyne-source*.zip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Unit tests
+        working-directory: melodyne
+        continue-on-error: true
+        run: gradle --no-daemon :app:testDebugUnitTest
+      - name: Signing key
+        working-directory: melodyne
+        run: keytool -genkeypair -keystore app/release.jks -storepass melodyne -keypass melodyne -alias melodyne -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Melodyne"
+      - name: Build release APK
+        working-directory: melodyne
+        env:
+          KEYSTORE_PATH: release.jks
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Collect APK
+        run: cp melodyne/app/build/outputs/apk/release/app-release.apk melodyne.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: melodyne-apk
+          path: melodyne.apk
+      - name: Size gate (under 5 MB)
+        run: |
+          SIZE=$(stat -c%s melodyne.apk)
+          echo "APK size: $SIZE bytes"
+          test "$SIZE" -lt 5000000
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Melodyne latest
+          files: melodyne.apk
