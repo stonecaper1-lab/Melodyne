@@ -1,48 +1,89 @@
 name: build-apk
+
 on:
   push:
+    branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
 jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unzip project
-        run: unzip -q melodyne-source*.zip
+        with:
+          fetch-depth: 0
+
+      - name: Import the uploaded zip as a commit
+        run: |
+          ZIP=$(ls melodyne-source*.zip 2>/dev/null | head -n 1 || true)
+          if [ -z "$ZIP" ]; then echo "No zip to import; building the repository as it is."; exit 0; fi
+          rm -rf _unz && mkdir _unz && unzip -q "$ZIP" -d _unz
+          SRC=_unz/melodyne; [ -d "$SRC" ] || SRC=_unz
+          rm -f "$ZIP"
+          rsync -a --delete --exclude='.git' --exclude='.github' --exclude='LICENSE*' --exclude='_unz' "$SRC"/ ./
+          rm -rf _unz
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "Nothing changed."; exit 0; fi
+          NOTES=$(awk '/^## /{n++; next} n==1' CHANGELOG.md 2>/dev/null || true)
+          git commit -m "Melodyne v$VERSION" -m "$NOTES"
+          git push
+
+      - name: Read version and release notes
+        id: meta
+        run: |
+          echo "version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)" >> "$GITHUB_OUTPUT"
+          awk '/^## /{n++; next} n==1' CHANGELOG.md > RELEASE_NOTES.md 2>/dev/null || echo "See the commit history." > RELEASE_NOTES.md
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+
       - name: Unit tests
-        working-directory: melodyne
         continue-on-error: true
         run: gradle --no-daemon :app:testDebugUnitTest
-      - name: Signing key
-        working-directory: melodyne
-        run: keytool -genkeypair -keystore app/release.jks -storepass melodyne -keypass melodyne -alias melodyne -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Melodyne"
+
       - name: Build release APK
-        working-directory: melodyne
         env:
-          KEYSTORE_PATH: release.jks
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: gradle --no-daemon :app:assembleRelease
+
       - name: Collect APK
-        run: cp melodyne/app/build/outputs/apk/release/app-release.apk melodyne.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk melodyne.apk
+          cp melodyne.apk "Melodyne-v${{ steps.meta.outputs.version }}.apk"
+
       - uses: actions/upload-artifact@v4
         with:
           name: melodyne-apk
           path: melodyne.apk
-      - name: Size gate (under 5 MB)
+
+      - name: Size gate (must be under 5 MB)
         run: |
           SIZE=$(stat -c%s melodyne.apk)
           echo "APK size: $SIZE bytes"
           test "$SIZE" -lt 5000000
+
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: Melodyne latest
-          files: melodyne.apk
+          tag_name: v${{ steps.meta.outputs.version }}
+          name: Melodyne v${{ steps.meta.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            melodyne.apk
+            Melodyne-v${{ steps.meta.outputs.version }}.apk
