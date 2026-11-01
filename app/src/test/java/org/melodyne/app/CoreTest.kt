@@ -4,12 +4,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.melodyne.app.ai.AiClient
 import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.audio.EQ_BANDS
 import org.melodyne.app.audio.Loudness
 import org.melodyne.app.audio.PlaybackState
+import org.melodyne.app.data.repo.AlbumService
 import org.melodyne.app.data.repo.CloudBuilder
 import org.melodyne.app.data.update.UpdateChecker
 import org.melodyne.app.player.BitrateSeries
@@ -19,6 +21,8 @@ import org.melodyne.app.data.catalog.StreamCrypto
 import org.melodyne.app.data.lastfm.LastFmSigner
 import org.melodyne.app.data.lastfm.ScrobbleText
 import org.melodyne.app.domain.LibraryData
+import org.melodyne.app.domain.Lyrics
+import org.melodyne.app.domain.MusicRepository
 import org.melodyne.app.domain.LibraryOps
 import org.melodyne.app.domain.LrcParser
 import org.melodyne.app.domain.PlayStat
@@ -236,5 +240,21 @@ class CoreTest {
         assertTrue(tags.all { it.weight in 0f..1f })
         assertEquals(names, CloudBuilder.build(listOf("rock" to 1000L, "seen live" to 900L, "electronic" to 100L, "2010" to 50L, "Favorites" to 40L)).map { it.name })
         assertTrue(CloudBuilder.sizeSp(1f) > CloudBuilder.sizeSp(0.2f))
+    }
+
+    // ---- album and composer ----
+    @Test fun albumFallsBackToNameSearchWhenTheIdYieldsNothing() = runBlocking {
+        val songs = listOf(song("1", "A").copy(album = "Aashiqui 2"), song("2", "B").copy(album = "Aashiqui 2"), song("3", "C").copy(album = "Other"))
+        val repo = object : MusicRepository {
+            override suspend fun search(query: String) = songs
+            override suspend fun lyrics(songId: String): Lyrics? = null
+            override suspend fun albumSongs(albumId: String): List<Song> = emptyList()
+        }
+        assertEquals(listOf("1", "2"), AlbumService(repo).tracks(songs[0].copy(albumId = "x")).map { it.id })
+    }
+
+    @Test fun composerCreditsSplitIntoSeparateNames() {
+        assertEquals(setOf("pritam", "mithoon"), org.melodyne.app.domain.TitleText.artistKeys("Pritam, Mithoon"))
+        assertEquals("", song("1", "A").composer)                       // old saved songs default to "no composer"
     }
 }

@@ -9,6 +9,8 @@ object Keys {
     const val HAS_LYRICS = "has_lyrics"
     const val STREAM_URL = "stream_url"
     const val THUMB = "thumb"
+    const val ALBUM_ID = "album_id"
+    const val COMPOSER = "composer"
 }
 
 /**

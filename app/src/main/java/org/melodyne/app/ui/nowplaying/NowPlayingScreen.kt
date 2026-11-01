@@ -73,7 +73,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -93,7 +92,9 @@ import org.melodyne.app.ui.Glyph
 import org.melodyne.app.ui.IconBtn
 import org.melodyne.app.ui.LocalAccent
 import org.melodyne.app.ui.LocalAddToPlaylist
+import org.melodyne.app.ui.LocalOpenAlbum
 import org.melodyne.app.ui.LocalOpenChain
+import org.melodyne.app.ui.LocalOpenComposer
 import org.melodyne.app.ui.LocalOpenGenre
 import org.melodyne.app.ui.Pill
 import org.melodyne.app.ui.Sparkline
@@ -117,10 +118,13 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
     val addToPlaylist = LocalAddToPlaylist.current
     val openChain = LocalOpenChain.current
     val openGenre = LocalOpenGenre.current
+    val openAlbum = LocalOpenAlbum.current
+    val openComposer = LocalOpenComposer.current
     LaunchedEffect(ps.songId) { vm.load(ps.currentSong) }
 
     var showLyrics by remember { mutableStateOf(false) }
     var showEq by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     // The clock and the live bitrate live in State holders that only small children read, so the artwork and the rest
     // of the screen never recompose with them (that was the flicker).
     val pos = remember { mutableLongStateOf(0L) }
@@ -141,7 +145,7 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             delay(if (ps.isPlaying) 250 else 1000)
         }
     }
-    BackHandler(enabled = showEq || showLyrics) { showEq = false; showLyrics = false }
+    BackHandler(enabled = showEq || showLyrics || showMenu) { showEq = false; showLyrics = false; showMenu = false }
 
     // Album art "expands" on open, then breathes with play/pause.
     var entered by remember { mutableStateOf(false) }
@@ -167,21 +171,18 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             // Top bar: close | title | infinite, EQ, add to playlist
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconBtn(G.Down, Amoled.OnBg, onClick = onClose)
-                Txt(
-                    if (pb.audiophile) "AUDIOPHILE · CHAIN" else "NOW PLAYING",
-                    Modifier.weight(1f).clickable(enabled = pb.audiophile, onClick = openChain),
-                    size = 12.sp, color = if (pb.audiophile) accent else Amoled.Muted, weight = FontWeight.SemiBold, align = TextAlign.Center,
-                )
+                Spacer(Modifier.weight(1f))
                 Chip("∞", pb.infinite) { playback.setInfinite(!pb.infinite) }
                 Spacer(Modifier.width(6.dp))
                 Chip("EQ", eqState.shaping && !pb.audiophile) { showEq = true }
                 AddButton { ps.currentSong?.let(addToPlaylist) }
+                Txt("•••", Modifier.clickable { showMenu = true }.padding(horizontal = 10.dp, vertical = 8.dp), size = 14.sp, weight = FontWeight.Black, color = accent)
             }
 
-            // Artwork: swipe left/right for next/previous, swipe up for lyrics. The live bitrate sits on its corner.
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            // Artwork with its details right underneath: swipe the art left/right for next/previous, up for lyrics.
+            Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(
-                    Modifier.aspectRatio(1f)
+                    Modifier.weight(1f, fill = false).aspectRatio(1f)
                         .graphicsLayer { scaleX = enter * breathe; scaleY = enter * breathe }
                         .pointerInput(Unit) {
                             var dx = 0f
@@ -200,12 +201,9 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
                         },
                 ) {
                     Cover(ps.artUrl, Modifier.fillMaxSize(), radius = 30.dp)
-                    QualityBadge(ps.quality, live, avg, spark, Modifier.align(Alignment.BottomStart).padding(12.dp), onArt = true)
                 }
-            }
-
-            // Title, artist, genre tags (tap one to open it) and the lyrics button
-            Row(Modifier.fillMaxWidth().padding(top = 22.dp), verticalAlignment = Alignment.Top) {
+            // Details sit directly under the artwork: title, artist, genre tags (tap one to open it), lyrics button
+            Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Txt(ps.title, size = 26.sp, weight = FontWeight.ExtraBold)
                     Txt(ps.artist, size = 16.sp, color = Amoled.Muted)
@@ -227,7 +225,9 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
                     i.listeners?.let { Txt(compact(it) + " listeners", Modifier.padding(vertical = 6.dp), size = 12.sp, color = Amoled.Muted) }
                 }
             }
+            }
 
+            QualityBadge(ps.quality, live, avg, spark, Modifier.padding(top = 10.dp))   // just above the progress bar
             SeekBar(pos, dur, accent, Modifier.padding(top = 12.dp)) { ms -> conn.seekTo(ms); pos.longValue = ms }
             TimeRow(pos, dur)
 
@@ -246,7 +246,7 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             }
         }
 
-        if (showEq || showLyrics) Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showEq = false; showLyrics = false })
+        if (showEq || showLyrics || showMenu) Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showEq = false; showLyrics = false; showMenu = false })
 
         // Equalizer sheet
         AnimatedVisibility(
@@ -282,6 +282,46 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
                 LyricsPanel(lyrics, pos, accent, Modifier.weight(1f).fillMaxWidth())
             }
         }
+
+        // Song menu: album, composer, playlist, signal chain
+        AnimatedVisibility(
+            visible = showMenu,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(tween(300)) { it } + fadeIn(tween(200)),
+            exit = slideOutVertically(tween(240)) { it } + fadeOut(tween(160)),
+        ) {
+            val song = ps.currentSong
+            val composers = song?.composer.orEmpty().split(",").map { it.trim() }.filter { it.isNotBlank() }
+            Column(
+                Modifier.fillMaxWidth().glassSheet().clickable(enabled = false) {}.navigationBarsPadding().padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Txt(ps.title, size = 18.sp, weight = FontWeight.ExtraBold)
+                Txt(ps.artist, Modifier.padding(bottom = 8.dp), size = 13.sp, color = Amoled.Muted)
+                if (song != null && song.album.isNotBlank()) MenuRow("Go to album", song.album) { showMenu = false; openAlbum(song) }
+                composers.forEach { c -> MenuRow("Go to composer", c) { showMenu = false; openComposer(c) } }
+                if (song != null) MenuRow("Add to playlist", null) { showMenu = false; addToPlaylist(song) }
+                MenuRow("Signal chain", if (pb.audiophile) "Audiophile Mode is on" else null) { showMenu = false; openChain() }
+                if (song != null && song.album.isBlank() && composers.isEmpty()) {
+                    Txt("The source doesn't list an album or composer for this song.", size = 12.sp, color = Amoled.Muted, maxLines = 2)
+                }
+                Pill("Close", Modifier.padding(top = 8.dp), filled = false, onClick = { showMenu = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuRow(title: String, subtitle: String?, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Txt(title, size = 16.sp, weight = FontWeight.SemiBold)
+            if (subtitle != null) Txt(subtitle, size = 12.sp, color = Amoled.Muted)
+        }
+        Txt("›", size = 22.sp, color = Amoled.Muted)
     }
 }
 

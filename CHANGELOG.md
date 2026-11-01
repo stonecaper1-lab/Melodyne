@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.1
+- Now Playing has a ••• menu: Go to album (full track list), Go to composer (credits, Last.fm bio and genres, songs), Add to playlist, Signal chain.
+- Now Playing layout: the title, artist and genre tags sit right under the artwork, and the bitrate pill sits just above the progress bar.
+- Songs now carry their album id and composer; saved playlists from earlier versions still load.
+
 ## v0.6.0
 - Liquid glass look: translucent panels with a light-catching edge, a floating glass navigation bar with a springy "liquid" indicator, glass sheets and dialogs, soft colour glow behind everything and a blurred-artwork backdrop on Now Playing (Settings > Appearance turns the glow off for pure AMOLED black).
 - Exact live bitrate: every compressed audio frame is measured as it plays, so the number is real and moves with variable-bitrate files; average = file size / duration; tap the badge for a 40-second line chart.

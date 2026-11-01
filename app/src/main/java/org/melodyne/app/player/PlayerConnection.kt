@@ -163,6 +163,8 @@ class PlayerConnection(private val app: Context) {
             streamUrl = url,
             streamKbps = ex.getInt(Keys.HINT_KBPS),
             hasLyrics = ex.getBoolean(Keys.HAS_LYRICS),
+            albumId = ex.getString(Keys.ALBUM_ID).orEmpty(),
+            composer = ex.getString(Keys.COMPOSER).orEmpty(),
         )
     }
 
@@ -179,6 +181,8 @@ class PlayerConnection(private val app: Context) {
                     putBoolean(Keys.HAS_LYRICS, s.hasLyrics)
                     putString(Keys.STREAM_URL, s.streamUrl)
                     putString(Keys.THUMB, s.thumbUrl)
+                    putString(Keys.ALBUM_ID, s.albumId)
+                    putString(Keys.COMPOSER, s.composer)
                 })
                 .build()
         ).build()

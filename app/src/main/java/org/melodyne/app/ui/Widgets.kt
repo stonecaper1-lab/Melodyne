@@ -44,6 +44,9 @@ val LocalAddToPlaylist = staticCompositionLocalOf<(Song) -> Unit> { {} }
 /** Provided by App: opens the signal-chain sheet / the hidden screen. */
 val LocalOpenChain = staticCompositionLocalOf<() -> Unit> { {} }
 val LocalOpenEaster = staticCompositionLocalOf<() -> Unit> { {} }
+/** Open the album page for a song, or the page for a composer. */
+val LocalOpenAlbum = staticCompositionLocalOf<(Song) -> Unit> { {} }
+val LocalOpenComposer = staticCompositionLocalOf<(String) -> Unit> { {} }
 /** Opens the page for a genre/tag. Used by the genre cloud and by the tags on Now Playing. */
 val LocalOpenGenre = staticCompositionLocalOf<(String) -> Unit> { {} }
 

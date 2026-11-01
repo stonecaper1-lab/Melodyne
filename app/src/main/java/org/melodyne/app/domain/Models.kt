@@ -15,6 +15,9 @@ data class Song(
     /** Bitrate the API advertised for [streamUrl]. The player later verifies it. */
     val streamKbps: Int,
     val hasLyrics: Boolean,
+    val albumId: String = "",
+    /** Music director(s), comma-separated. Empty when the source doesn't list one. */
+    val composer: String = "",
 )
 
 data class LyricLine(val timeMs: Long, val text: String)
@@ -25,4 +28,6 @@ data class Lyrics(val lines: List<LyricLine>, val plain: String) {
 interface MusicRepository {
     suspend fun search(query: String): List<Song>
     suspend fun lyrics(songId: String): Lyrics?
+    /** Every song on an album, in track order. Empty when the source can't say. */
+    suspend fun albumSongs(albumId: String): List<Song>
 }

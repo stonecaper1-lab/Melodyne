@@ -97,6 +97,8 @@ class HostedRepository(private val api: HostedApi, private val hosts: HostStore)
         call("s:$query") { h -> api.searchSongs("$h/search/songs", query, 0, 40) }
             .results.mapNotNull { it.toSong() }
 
+    override suspend fun albumSongs(albumId: String): List<Song> = emptyList()
+
     override suspend fun lyrics(songId: String): Lyrics? = try {
         val d = call("l:$songId") { h -> api.lyrics("$h/songs/$songId/lyrics") }
         d.lyrics?.takeIf { it.isNotBlank() }?.let { LrcParser.parse(it) }

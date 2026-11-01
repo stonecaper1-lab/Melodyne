@@ -43,6 +43,11 @@ class CatalogRepository(private val api: CatalogApi, private val json: Json) : M
         return r.results.mapNotNull { it.toSong() }
     }
 
+    override suspend fun albumSongs(albumId: String): List<Song> {
+        val r = parse(get("__call" to "content.getAlbumDetails", "albumid" to albumId), CAlbum.serializer())
+        return r.list.mapNotNull { it.toSong() }
+    }
+
     override suspend fun lyrics(songId: String): Lyrics? = try {
         val r = parse(get("__call" to "lyrics.getLyrics", "lyrics_id" to songId), CLyrics.serializer())
         r.lyrics?.takeIf { it.isNotBlank() }?.let { LrcParser.parse(it) }
@@ -60,6 +65,8 @@ private fun CSong.toSong(): Song? {
     // 320 kbps exists only when the song is flagged for it; otherwise take the next best.
     val kbps = if (m.kbps320 == "true") 320 else 160
     val artists = m.artistMap?.primary?.takeIf { it.isNotEmpty() } ?: m.artistMap?.artists.orEmpty()
+    val composers = (m.artistMap?.artists.orEmpty().filter { it.role.equals("music", true) || it.role.equals("composer", true) }.map { it.name.clean() } +
+        (m.music?.split(",")?.map { it.trim().clean() } ?: emptyList())).filter { it.isNotBlank() }.distinct().joinToString(", ")
     return Song(
         id = id,
         title = title.clean(),
@@ -71,5 +78,7 @@ private fun CSong.toSong(): Song? {
         streamUrl = StreamCrypto.withBitrate(base, kbps),
         streamKbps = kbps,
         hasLyrics = m.hasLyrics == "true",
+        albumId = m.albumId.orEmpty(),
+        composer = composers,
     )
 }

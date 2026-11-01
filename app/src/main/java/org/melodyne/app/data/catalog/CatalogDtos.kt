@@ -7,7 +7,7 @@ import retrofit2.http.GET
 import retrofit2.http.QueryMap
 
 /** Raw reply shapes of the catalogue's web endpoint. Everything is optional on purpose. */
-@Serializable data class CArtist(val id: String = "", val name: String = "")
+@Serializable data class CArtist(val id: String = "", val name: String = "", val role: String = "")
 @Serializable data class CArtistMap(
     @SerialName("primary_artists") val primary: List<CArtist> = emptyList(),
     val artists: List<CArtist> = emptyList(),
@@ -19,6 +19,8 @@ data class CMore(
     val duration: String? = null,
     @SerialName("has_lyrics") val hasLyrics: String? = null,
     @SerialName("320kbps") val kbps320: String? = null,
+    @SerialName("album_id") val albumId: String? = null,
+    val music: String? = null,
     @SerialName("encrypted_media_url") val encryptedUrl: String? = null,
     val artistMap: CArtistMap? = null,
 )
@@ -32,6 +34,7 @@ data class CSong(
     @SerialName("more_info") val more: CMore? = null,
 )
 
+@Serializable data class CAlbum(val id: String = "", val title: String = "", val list: List<CSong> = emptyList())
 @Serializable data class CSearch(val results: List<CSong> = emptyList())
 @Serializable data class CLyrics(val lyrics: String? = null)
 

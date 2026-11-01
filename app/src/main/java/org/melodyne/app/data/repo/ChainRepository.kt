@@ -36,6 +36,13 @@ class ChainRepository(private val sources: () -> List<MusicRepository>) : MusicR
         Refine.songs(query, first({ it: List<Song> -> it.isNotEmpty() }) { it.search(query) })
 
 
+    override suspend fun albumSongs(albumId: String): List<Song> {
+        for (src in sources()) {
+            try { val r = src.albumSongs(albumId); if (r.isNotEmpty()) return r } catch (e: CancellationException) { throw e } catch (ignored: Exception) {}
+        }
+        return emptyList()
+    }
+
     override suspend fun lyrics(songId: String): Lyrics? {
         for (src in sources()) {
             try { src.lyrics(songId)?.let { return it } } catch (e: CancellationException) { throw e } catch (ignored: Exception) {}
