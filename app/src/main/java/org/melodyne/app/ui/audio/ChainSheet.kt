@@ -11,11 +11,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +41,7 @@ import org.melodyne.app.ui.Amoled
 import org.melodyne.app.ui.Panel
 import org.melodyne.app.ui.Pill
 import org.melodyne.app.ui.Txt
+import org.melodyne.app.ui.glassSheet
 
 /** The honest signal chain: what happens to the audio from the file to your ears, and where it stops being clean. */
 @Composable
@@ -51,18 +51,22 @@ fun ChainSheet(onClose: () -> Unit) {
     val pb by ServiceLocator.playback.state.collectAsState()
     val eq by ServiceLocator.eq.state.collectAsState()
     var chain by remember { mutableStateOf<Chain?>(null) }
+    var bit by remember { mutableStateOf<Triple<Int, Int, List<Int>>?>(null) }
     BackHandler(onBack = onClose)
     LaunchedEffect(ps.quality, pb, eq) {
         while (true) {
             val name = if (eq.presetId == CUSTOM_ID) "Custom" else EqPresets.byId(eq.presetId).name
             chain = OutputInspector.chain(ctx, ps.quality, pb, eq, name)
+            val series = ps.currentSong?.streamUrl?.let { ServiceLocator.bitrate.peek(it) }
+            val posMs = ServiceLocator.player.position()
+            bit = series?.let { Triple(it.kbpsAt(posMs) ?: 0, it.averageKbps() ?: 0, it.recent(posMs)) }
             delay(2000)
         }
     }
 
     Box(Modifier.fillMaxSize().background(Color(0xCC000000)).clickable(onClick = onClose), contentAlignment = Alignment.BottomCenter) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(Amoled.Surface)
+            Modifier.fillMaxWidth().glassSheet()
                 .clickable(enabled = false) {}.navigationBarsPadding().padding(20.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -76,6 +80,13 @@ fun ChainSheet(onClose: () -> Unit) {
                             Txt(l.value, Modifier.weight(1f), size = 13.sp, maxLines = 4)
                         }
                     }
+                }
+            }
+            bit?.let { (now, average, recent) ->
+                Panel("Bitrate") {
+                    Txt("Live $now kbps  ·  average $average kbps", size = 14.sp, weight = FontWeight.SemiBold)
+                    org.melodyne.app.ui.Sparkline(recent, org.melodyne.app.ui.LocalAccent.current, Modifier.fillMaxWidth().height(40.dp))
+                    Txt("Counted from the compressed audio frames as they play. The average is file size divided by duration.", size = 11.sp, color = Amoled.Muted, maxLines = 3)
                 }
             }
             Txt("Why no bit-perfect? The source itself is lossy AAC, so the best we can do is avoid ADDING more loss.", size = 12.sp, color = Amoled.Muted, maxLines = 3)

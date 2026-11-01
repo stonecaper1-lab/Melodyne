@@ -9,8 +9,6 @@ import org.melodyne.app.data.repo.ApiUnavailable
 import org.melodyne.app.domain.LrcParser
 import org.melodyne.app.domain.Lyrics
 import org.melodyne.app.domain.MusicRepository
-import org.melodyne.app.domain.Playlist
-import org.melodyne.app.domain.PlaylistInfo
 import org.melodyne.app.domain.Song
 import retrofit2.HttpException
 import java.io.IOException
@@ -43,16 +41,6 @@ class CatalogRepository(private val api: CatalogApi, private val json: Json) : M
     override suspend fun search(query: String): List<Song> {
         val r = parse(get("__call" to "search.getResults", "q" to query, "p" to "1", "n" to "40"), CSearch.serializer())
         return r.results.mapNotNull { it.toSong() }
-    }
-
-    override suspend fun searchPlaylists(query: String): List<PlaylistInfo> {
-        val r = parse(get("__call" to "search.getPlaylistResults", "q" to query, "p" to "1", "n" to "12"), CPlaylistSearch.serializer())
-        return r.results.map { PlaylistInfo(it.id, it.title.clean(), it.image.big()) }
-    }
-
-    override suspend fun playlist(id: String): Playlist {
-        val r = parse(get("__call" to "playlist.getDetails", "listid" to id, "p" to "1", "n" to "50"), CPlaylist.serializer())
-        return Playlist(PlaylistInfo(r.id, r.title.clean(), r.image.big()), r.list.mapNotNull { it.toSong() })
     }
 
     override suspend fun lyrics(songId: String): Lyrics? = try {

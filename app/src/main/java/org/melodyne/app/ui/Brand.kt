@@ -67,3 +67,27 @@ fun SkeletonRow() {
         }
     }
 }
+
+/** A tiny line chart of recent values (bitrate over the last seconds). Flat data draws a flat line in the middle. */
+@Composable
+fun Sparkline(values: List<Int>, color: Color, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Canvas(modifier) {
+        if (values.size < 2) return@Canvas
+        val lo = values.min().toFloat()
+        val hi = values.max().toFloat()
+        val span = maxOf(hi - lo, 24f)                              // never exaggerate a tiny wiggle
+        val mid = (lo + hi) / 2f
+        val path = androidx.compose.ui.graphics.Path()
+        values.forEachIndexed { i, v ->
+            val x = size.width * i / (values.size - 1)
+            val y = size.height / 2f - (v - mid) / span * size.height * 0.9f
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(
+            path, color,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round,
+            ),
+        )
+    }
+}

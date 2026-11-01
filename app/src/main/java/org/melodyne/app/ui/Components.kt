@@ -22,7 +22,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -129,11 +131,12 @@ fun Cover(url: String?, modifier: Modifier = Modifier, radius: Dp = 8.dp) {
 @Composable
 fun Pill(text: String, modifier: Modifier = Modifier, filled: Boolean = true, onClick: () -> Unit) {
     val accent = LocalAccent.current
+    val shape = RoundedCornerShape(50)
+    val base = if (filled) {
+        modifier.clip(shape).background(Brush.verticalGradient(listOf(lerp(accent, Color.White, 0.30f), accent)))
+    } else modifier.glass(shape, alpha = 0.08f)
     Box(
-        modifier.clip(RoundedCornerShape(50))
-            .background(if (filled) accent else Amoled.SurfaceHi)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+        base.clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Txt(text, color = if (filled) Color.Black else Amoled.OnBg, weight = FontWeight.SemiBold)
@@ -170,7 +173,7 @@ fun AddButton(onClick: () -> Unit) {
 @Composable
 fun ErrorCard(message: String, onRetry: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().padding(20.dp).clip(RoundedCornerShape(16.dp)).background(Amoled.Surface).padding(18.dp),
+        Modifier.fillMaxWidth().padding(20.dp).glass(RoundedCornerShape(20.dp), alpha = 0.06f).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Txt(message, color = Amoled.Err, maxLines = 10, size = 13.sp)

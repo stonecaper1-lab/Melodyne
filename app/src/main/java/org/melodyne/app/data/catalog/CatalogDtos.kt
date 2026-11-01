@@ -33,8 +33,6 @@ data class CSong(
 )
 
 @Serializable data class CSearch(val results: List<CSong> = emptyList())
-@Serializable data class CPlaylist(val id: String = "", val title: String = "", val image: String = "", val list: List<CSong> = emptyList())
-@Serializable data class CPlaylistSearch(val results: List<CPlaylist> = emptyList())
 @Serializable data class CLyrics(val lyrics: String? = null)
 
 interface CatalogApi {

@@ -3,8 +3,6 @@ package org.melodyne.app.data.repo
 import kotlinx.coroutines.CancellationException
 import org.melodyne.app.domain.Lyrics
 import org.melodyne.app.domain.MusicRepository
-import org.melodyne.app.domain.Playlist
-import org.melodyne.app.domain.PlaylistInfo
 import org.melodyne.app.domain.Refine
 import org.melodyne.app.domain.Song
 
@@ -37,8 +35,6 @@ class ChainRepository(private val sources: () -> List<MusicRepository>) : MusicR
     override suspend fun search(query: String): List<Song> =
         Refine.songs(query, first({ it: List<Song> -> it.isNotEmpty() }) { it.search(query) })
 
-    override suspend fun searchPlaylists(query: String): List<PlaylistInfo> = first({ it.isNotEmpty() }) { it.searchPlaylists(query) }
-    override suspend fun playlist(id: String): Playlist = first({ it.songs.isNotEmpty() }) { it.playlist(id) }
 
     override suspend fun lyrics(songId: String): Lyrics? {
         for (src in sources()) {

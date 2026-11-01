@@ -18,7 +18,6 @@ import org.melodyne.app.data.repo.MoodService
 import org.melodyne.app.data.repo.TrackResolver
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.MusicRepository
-import org.melodyne.app.domain.PlaylistInfo
 import org.melodyne.app.domain.Song
 import org.melodyne.app.domain.TitleText
 
@@ -26,7 +25,6 @@ data class HomeUi(
     val loading: Boolean = true,
     val trending: List<Song> = emptyList(),
     val trendingTitle: String = "Chart",
-    val playlists: List<PlaylistInfo> = emptyList(),
     val recents: List<Song> = emptyList(),
     val onRepeat: List<Song> = emptyList(),
     val becauseArtist: String? = null,
@@ -79,15 +77,12 @@ class HomeViewModel(
         _ui.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             val chart = async { runCatching { trending() } }
-            val lists = async { runCatching { repo.searchPlaylists("top") } }
             val c = chart.await()
-            val p = lists.await()
             _ui.update {
                 it.copy(
                     loading = false,
                     trending = c.getOrNull()?.second ?: it.trending,
                     trendingTitle = c.getOrNull()?.first ?: it.trendingTitle,
-                    playlists = p.getOrDefault(it.playlists),
                     error = c.exceptionOrNull()?.let { e -> (e as? ApiUnavailable)?.userMessage ?: "Something went wrong." },
                 )
             }
@@ -102,16 +97,6 @@ class HomeViewModel(
             if (songs.size >= 6) return "Trending in India" to songs
         }
         return "Chart" to repo.search("top hits")
-    }
-
-    fun playPlaylist(id: String, onReady: (List<Song>) -> Unit) {
-        viewModelScope.launch {
-            runCatching { repo.playlist(id) }
-                .onSuccess { onReady(it.songs) }
-                .onFailure { e ->
-                    _ui.update { it.copy(error = (e as? ApiUnavailable)?.userMessage ?: "Couldn't open playlist.") }
-                }
-        }
     }
 
     fun playMood(label: String, onReady: (List<Song>) -> Unit) {

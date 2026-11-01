@@ -1,10 +1,12 @@
 package org.melodyne.app.ui.nowplaying
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -13,7 +15,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -21,6 +22,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,24 +45,31 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.LongState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -67,8 +77,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
-import kotlin.math.abs
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.Lyrics
 import org.melodyne.app.player.AudioQuality
@@ -84,32 +94,50 @@ import org.melodyne.app.ui.IconBtn
 import org.melodyne.app.ui.LocalAccent
 import org.melodyne.app.ui.LocalAddToPlaylist
 import org.melodyne.app.ui.LocalOpenChain
+import org.melodyne.app.ui.LocalOpenGenre
 import org.melodyne.app.ui.Pill
+import org.melodyne.app.ui.Sparkline
 import org.melodyne.app.ui.Txt
 import org.melodyne.app.ui.fmtMs
+import org.melodyne.app.ui.glass
+import org.melodyne.app.ui.glassSheet
 import org.melodyne.app.ui.sound.EqPanel
+import kotlin.math.abs
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> Unit) {
     val vm: NowPlayingViewModel = viewModel(factory = NowPlayingViewModel.Factory)
     val lyrics by vm.lyrics.collectAsState()
     val info by vm.info.collectAsState()
     val eqState by ServiceLocator.eq.state.collectAsState()
-    val pb by ServiceLocator.playback.state.collectAsState()
+    val playback = ServiceLocator.playback
+    val pb by playback.state.collectAsState()
     val accent = LocalAccent.current
     val addToPlaylist = LocalAddToPlaylist.current
     val openChain = LocalOpenChain.current
+    val openGenre = LocalOpenGenre.current
     LaunchedEffect(ps.songId) { vm.load(ps.currentSong) }
 
     var showLyrics by remember { mutableStateOf(false) }
     var showEq by remember { mutableStateOf(false) }
-    // The clock lives in State holders that only the seek bar, time labels and lyrics read, so the artwork
-    // and the rest of the screen do not recompose four times a second (that was the flicker).
+    // The clock and the live bitrate live in State holders that only small children read, so the artwork and the rest
+    // of the screen never recompose with them (that was the flicker).
     val pos = remember { mutableLongStateOf(0L) }
     val dur = remember { mutableLongStateOf(0L) }
+    val live = remember { mutableIntStateOf(0) }
+    val avg = remember { mutableIntStateOf(0) }
+    val spark = remember { mutableStateOf<List<Int>>(emptyList()) }
     LaunchedEffect(ps.isPlaying, ps.songId) {
+        var n = 0
         while (true) {
             pos.longValue = conn.position(); dur.longValue = conn.duration()
+            val series = ps.currentSong?.streamUrl?.let { ServiceLocator.bitrate.peek(it) }
+            val k = series?.kbpsAt(pos.longValue) ?: 0
+            if (live.intValue != k) live.intValue = k
+            val a = series?.averageKbps() ?: 0
+            if (avg.intValue != a) avg.intValue = a
+            if (n++ % 4 == 0) spark.value = series?.recent(pos.longValue) ?: emptyList()
             delay(if (ps.isPlaying) 250 else 1000)
         }
     }
@@ -124,15 +152,19 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
     val breathe by animateFloatAsState(
         if (ps.isPlaying) 1f else 0.92f, spring(stiffness = Spring.StiffnessMediumLow), label = "breathe",
     )
-    val facts = listOfNotNull(
-        info?.tags?.takeIf { it.isNotEmpty() }?.joinToString(" · "),
-        info?.listeners?.let { compact(it) + " listeners" },
-    ).joinToString("   ")
 
-    // #000000 background, always: AMOLED pixels stay off.
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
+        // Liquid backdrop: the artwork, blurred and sunk into the dark. "Liquid glow" off keeps it pure AMOLED black.
+        if (pb.glow && ps.artUrl != null) {
+            AsyncImage(
+                model = ps.artUrl, contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(64.dp) else Modifier).graphicsLayer { alpha = 0.5f },
+            )
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x99000000), Color(0xE6000000), Color.Black))))
+        }
+
         Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
-            // Top bar: close | title | EQ + add to playlist
+            // Top bar: close | title | infinite, EQ, add to playlist
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconBtn(G.Down, Amoled.OnBg, onClick = onClose)
                 Txt(
@@ -140,11 +172,13 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
                     Modifier.weight(1f).clickable(enabled = pb.audiophile, onClick = openChain),
                     size = 12.sp, color = if (pb.audiophile) accent else Amoled.Muted, weight = FontWeight.SemiBold, align = TextAlign.Center,
                 )
+                Chip("∞", pb.infinite) { playback.setInfinite(!pb.infinite) }
+                Spacer(Modifier.width(6.dp))
                 Chip("EQ", eqState.shaping && !pb.audiophile) { showEq = true }
                 AddButton { ps.currentSong?.let(addToPlaylist) }
             }
 
-            // Artwork: swipe left/right for next/previous, swipe up for lyrics. The quality badge sits on its corner.
+            // Artwork: swipe left/right for next/previous, swipe up for lyrics. The live bitrate sits on its corner.
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Box(
                     Modifier.aspectRatio(1f)
@@ -165,31 +199,47 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
                             ) { change, amount -> change.consume(); dx += amount.x; dy += amount.y }
                         },
                 ) {
-                    Cover(ps.artUrl, Modifier.fillMaxSize(), radius = 28.dp)
-                    QualityBadge(ps.quality, Modifier.align(Alignment.BottomStart).padding(12.dp), onArt = true)
+                    Cover(ps.artUrl, Modifier.fillMaxSize(), radius = 30.dp)
+                    QualityBadge(ps.quality, live, avg, spark, Modifier.align(Alignment.BottomStart).padding(12.dp), onArt = true)
                 }
             }
 
-            // Title, artist, Last.fm facts and the lyrics button
-            Row(Modifier.fillMaxWidth().padding(top = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Title, artist, genre tags (tap one to open it) and the lyrics button
+            Row(Modifier.fillMaxWidth().padding(top = 22.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Txt(ps.title, size = 26.sp, weight = FontWeight.ExtraBold)
                     Txt(ps.artist, size = 16.sp, color = Amoled.Muted)
-                    if (facts.isNotEmpty()) Txt(facts, size = 12.sp, color = Amoled.Muted)
                 }
                 Chip("Lyrics", showLyrics) { showLyrics = true }
             }
+            info?.let { i ->
+                FlowRow(
+                    Modifier.fillMaxWidth().padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    i.tags.forEach { tag ->
+                        Txt(
+                            "#$tag",
+                            Modifier.glass(RoundedCornerShape(50), alpha = 0.07f).clickable { openGenre(tag) }.padding(horizontal = 12.dp, vertical = 6.dp),
+                            size = 12.sp, weight = FontWeight.SemiBold, color = accent,
+                        )
+                    }
+                    i.listeners?.let { Txt(compact(it) + " listeners", Modifier.padding(vertical = 6.dp), size = 12.sp, color = Amoled.Muted) }
+                }
+            }
 
-            SeekBar(pos, dur, accent, Modifier.padding(top = 14.dp)) { ms -> conn.seekTo(ms); pos.longValue = ms }
+            SeekBar(pos, dur, accent, Modifier.padding(top = 12.dp)) { ms -> conn.seekTo(ms); pos.longValue = ms }
             TimeRow(pos, dur)
 
+            // Transport on its own piece of glass
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                Modifier.fillMaxWidth().padding(vertical = 14.dp).glass(RoundedCornerShape(40.dp), alpha = 0.07f, strong = true).padding(vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconBtn(G.Prev, Amoled.OnBg, glyphSize = 32.dp, onClick = conn::prev)
                 Box(
-                    Modifier.size(72.dp).clip(CircleShape).background(accent).clickable(onClick = conn::toggle),
+                    Modifier.size(72.dp).clip(CircleShape).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f).compositeOver(accent), accent)))
+                        .clickable(onClick = conn::toggle),
                     contentAlignment = Alignment.Center,
                 ) { Glyph(if (ps.isPlaying) G.Pause else G.Play, Color.Black, 34.dp) }
                 IconBtn(G.Next, Amoled.OnBg, glyphSize = 32.dp, onClick = conn::next)
@@ -206,8 +256,7 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             exit = slideOutVertically(tween(240)) { it } + fadeOut(tween(160)),
         ) {
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(Amoled.Surface)
-                    .clickable(enabled = false) {}.navigationBarsPadding().padding(20.dp),
+                Modifier.fillMaxWidth().glassSheet().clickable(enabled = false) {}.navigationBarsPadding().padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 EqPanel()
@@ -223,8 +272,8 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             exit = slideOutVertically(tween(240)) { it } + fadeOut(tween(160)),
         ) {
             Column(
-                Modifier.fillMaxWidth().fillMaxHeight(0.7f).clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(Amoled.Surface)
-                    .clickable(enabled = false) {}.navigationBarsPadding().padding(horizontal = 22.dp, vertical = 18.dp),
+                Modifier.fillMaxWidth().fillMaxHeight(0.7f).glassSheet().clickable(enabled = false) {}
+                    .navigationBarsPadding().padding(horizontal = 22.dp, vertical = 18.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Txt("Lyrics", Modifier.weight(1f), size = 20.sp, weight = FontWeight.ExtraBold)
@@ -243,29 +292,36 @@ private fun compact(n: Long): String = when {
 }
 
 /**
- * Real-time quality badge. The text comes from QualityMonitor, which reads the Format ExoPlayer
- * hands to the decoder. Green dot = read from the stream's own header; amber = the server's label only.
- * Tap it for the plain-language explanation.
+ * Exact stream quality. The big number is counted from the compressed audio frames as they play (updated every
+ * second, so a variable-bitrate file visibly moves); "avg" is file size / duration. Tap for the plain-language
+ * explanation and the last 40 seconds as a line.
  */
 @Composable
-fun QualityBadge(q: AudioQuality?, modifier: Modifier = Modifier, onArt: Boolean = false) {
+fun QualityBadge(
+    q: AudioQuality?, live: IntState, avg: IntState, spark: State<List<Int>>,
+    modifier: Modifier = Modifier, onArt: Boolean = false,
+) {
     val accent = LocalAccent.current
     var open by remember { mutableStateOf(false) }
-    val text = q?.label() ?: "Loading stream…"
-    val detail = q?.detail().orEmpty()
+    val shown by animateIntAsState(live.intValue, tween(450), label = "kbps")
+    val measured = live.intValue > 0
+    val text = if (measured) "$shown kbps ${q?.codec ?: "AAC"}" else q?.label() ?: "Loading stream…"
+    val detail = listOfNotNull(
+        avg.intValue.takeIf { it > 0 }?.let { "avg $it" },
+        q?.detail()?.takeIf { it.isNotBlank() },
+    ).joinToString(" · ")
     val shape = RoundedCornerShape(18.dp)
     Column(
         modifier
             .semantics { contentDescription = "Audio quality $text $detail" }
-            .clip(shape)
-            .background(if (onArt) Color(0xCC000000) else Color.Transparent)
-            .border(1.dp, accent.copy(alpha = 0.6f), shape)
+            .then(if (onArt) Modifier.clip(shape).background(Color(0xCC000000)) else Modifier)
+            .glass(shape, alpha = 0.06f, strong = true)
             .clickable { open = !open }
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(if (q?.verified == true) Amoled.Ok else Amoled.Warn))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(if (measured || q?.verified == true) Amoled.Ok else Amoled.Warn))
             Spacer(Modifier.width(8.dp))
             Txt(text, size = 12.sp, color = accent, weight = FontWeight.Bold)
             if (detail.isNotEmpty()) {
@@ -274,13 +330,11 @@ fun QualityBadge(q: AudioQuality?, modifier: Modifier = Modifier, onArt: Boolean
             }
         }
         if (open && q != null) {
+            Sparkline(spark.value, accent, Modifier.fillMaxWidth().height(34.dp))
             Txt(
-                if (q.verified) {
-                    "Read from the stream's own header" + if (q.measured > 0 && q.measured != q.kbps) " (${q.measured} kbps exactly)." else "."
-                } else {
-                    "The server's label. The stream hasn't confirmed it yet."
-                },
-                size = 11.sp, color = Amoled.Muted, maxLines = 2,
+                if (measured) "Counted from the audio frames as they play, updated every second. avg = file size ÷ duration."
+                else "The server's label. The stream hasn't confirmed it yet.",
+                size = 11.sp, color = Amoled.Muted, maxLines = 3,
             )
         }
     }

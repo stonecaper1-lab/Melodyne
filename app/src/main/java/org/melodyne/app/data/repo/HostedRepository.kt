@@ -10,8 +10,6 @@ import org.melodyne.app.data.remote.UrlDto
 import org.melodyne.app.domain.LrcParser
 import org.melodyne.app.domain.Lyrics
 import org.melodyne.app.domain.MusicRepository
-import org.melodyne.app.domain.Playlist
-import org.melodyne.app.domain.PlaylistInfo
 import org.melodyne.app.domain.Song
 import org.melodyne.app.domain.StreamPicker
 import retrofit2.HttpException
@@ -98,15 +96,6 @@ class HostedRepository(private val api: HostedApi, private val hosts: HostStore)
     override suspend fun search(query: String): List<Song> =
         call("s:$query") { h -> api.searchSongs("$h/search/songs", query, 0, 40) }
             .results.mapNotNull { it.toSong() }
-
-    override suspend fun searchPlaylists(query: String): List<PlaylistInfo> =
-        call("sp:$query") { h -> api.searchPlaylists("$h/search/playlists", query, 0, 12) }
-            .results.map { PlaylistInfo(it.id, it.name.clean(), it.image.bestArt()) }
-
-    override suspend fun playlist(id: String): Playlist {
-        val d = call("p:$id") { h -> api.playlist("$h/playlists", id, 0, 50) }
-        return Playlist(PlaylistInfo(d.id, d.name.clean(), d.image.bestArt()), d.songs.mapNotNull { it.toSong() })
-    }
 
     override suspend fun lyrics(songId: String): Lyrics? = try {
         val d = call("l:$songId") { h -> api.lyrics("$h/songs/$songId/lyrics") }

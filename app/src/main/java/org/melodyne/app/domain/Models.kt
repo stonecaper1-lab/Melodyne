@@ -17,9 +17,6 @@ data class Song(
     val hasLyrics: Boolean,
 )
 
-data class PlaylistInfo(val id: String, val name: String, val artUrl: String?)
-data class Playlist(val info: PlaylistInfo, val songs: List<Song>)
-
 data class LyricLine(val timeMs: Long, val text: String)
 data class Lyrics(val lines: List<LyricLine>, val plain: String) {
     val synced: Boolean get() = lines.size >= 3
@@ -27,7 +24,5 @@ data class Lyrics(val lines: List<LyricLine>, val plain: String) {
 
 interface MusicRepository {
     suspend fun search(query: String): List<Song>
-    suspend fun searchPlaylists(query: String): List<PlaylistInfo>
-    suspend fun playlist(id: String): Playlist
     suspend fun lyrics(songId: String): Lyrics?
 }

@@ -105,6 +105,20 @@ class EnrichmentService(
         call("tag.getTopTracks", "tag" to tag, "limit" to limit.toString())
             ?.obj("tracks")?.get("track").items().mapNotNull(::asSuggestion)
 
+    /** Last.fm's most-used tags, as (name, taggings). The source of the genre cloud. */
+    suspend fun topTags(limit: Int = 80): List<Pair<String, Long>> =
+        call("chart.getTopTags", "limit" to limit.toString())?.obj("tags")?.get("tag").items().mapNotNull { t ->
+            val n = t.str("name") ?: return@mapNotNull null
+            n to (t.str("taggings")?.toLongOrNull() ?: t.str("reach")?.toLongOrNull() ?: 1L)
+        }
+
+    suspend fun tagSummary(tag: String): String? =
+        call("tag.getInfo", "tag" to tag)?.obj("tag")?.obj("wiki")?.str("summary")?.let { plain(it) }?.takeIf { it.isNotBlank() }
+
+    suspend fun similarTracks(title: String, artist: String, limit: Int = 20): List<Suggestion> =
+        call("track.getSimilar", "track" to title, "artist" to artist, "limit" to limit.toString())
+            ?.obj("similartracks")?.get("track").items().mapNotNull(::asSuggestion)
+
     suspend fun geoTopTracks(country: String, limit: Int = 25): List<Suggestion> =
         call("geo.getTopTracks", "country" to country, "limit" to limit.toString())
             ?.obj("tracks")?.get("track").items().mapNotNull(::asSuggestion)

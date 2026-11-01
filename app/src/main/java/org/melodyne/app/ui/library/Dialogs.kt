@@ -30,6 +30,7 @@ import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.Song
 import org.melodyne.app.ui.Amoled
 import org.melodyne.app.ui.Field
+import org.melodyne.app.ui.glassSheet
 import org.melodyne.app.ui.LocalAccent
 import org.melodyne.app.ui.Pill
 import org.melodyne.app.ui.Txt
@@ -37,7 +38,7 @@ import org.melodyne.app.ui.Txt
 @Composable
 private fun DialogCard(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Amoled.Surface).padding(20.dp),
+        Modifier.fillMaxWidth().glassSheet(RoundedCornerShape(26.dp)).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) { content() }
 }

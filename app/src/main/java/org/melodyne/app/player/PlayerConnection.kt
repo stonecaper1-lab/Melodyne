@@ -53,7 +53,7 @@ class PlayerConnection(private val app: Context) {
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = sync(player)
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { scheduleCount(mediaItem) }
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { scheduleCount(mediaItem); controller?.let { maybeExtend(it) } }
         override fun onPlayerError(error: PlaybackException) { controller?.let { heal(it) } }
     }
 
@@ -96,6 +96,24 @@ class PlayerConnection(private val app: Context) {
                 error = p.playerError?.let { e -> "Stream failed (${e.errorCodeName})" },
                 currentSong = item?.toSong(),
             )
+        }
+    }
+
+    private var extending = false
+
+    /** Infinite play: when two or fewer songs are left, ask for similar ones and queue them behind the current queue. */
+    private fun maybeExtend(c: Player) {
+        if (!ServiceLocator.playback.state.value.infinite || extending) return
+        if (c.mediaItemCount - c.currentMediaItemIndex - 1 > 2) return
+        extending = true
+        scope.launch {
+            try {
+                val queue = (0 until c.mediaItemCount).mapNotNull { c.getMediaItemAt(it).toSong() }
+                val more = runCatching { ServiceLocator.infinite.next(queue) }.getOrDefault(emptyList())
+                if (more.isNotEmpty()) withController { ctl -> ctl.addMediaItems(more.map { toItem(it) }) }
+            } finally {
+                extending = false
+            }
         }
     }
 

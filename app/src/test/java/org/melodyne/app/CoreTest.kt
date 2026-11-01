@@ -6,10 +6,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.melodyne.app.ai.AiClient
+import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.audio.EQ_BANDS
 import org.melodyne.app.audio.Loudness
 import org.melodyne.app.audio.PlaybackState
+import org.melodyne.app.data.repo.CloudBuilder
 import org.melodyne.app.data.update.UpdateChecker
+import org.melodyne.app.player.BitrateSeries
 import org.melodyne.app.audio.EqMath
 import org.melodyne.app.audio.EqPresets
 import org.melodyne.app.data.catalog.StreamCrypto
@@ -198,5 +201,40 @@ class CoreTest {
         assertFalse(UpdateChecker.isNewer("0.5.0", "0.5.0"))
         assertFalse(UpdateChecker.isNewer("v0.4.9", "0.5.0"))
         assertFalse(UpdateChecker.isNewer("0.5", "0.5.0"))
+    }
+
+    // ---- live bitrate, crossfade, genre cloud ----
+    @Test fun bitrateIsCountedFromFramesAndNeverDoubleCounts() {
+        val cbr = BitrateSeries()
+        repeat(2) { for (n in 0 until 430) cbr.record(n * 23_220L, 929) }          // 10 s of 320 kbps AAC at 44.1 kHz, fed twice (a seek)
+        assertEquals(320.0, cbr.kbpsAt(4000)!!.toDouble(), 4.0)
+        assertEquals(320.0, cbr.averageKbps()!!.toDouble(), 4.0)
+        val vbr = BitrateSeries()
+        for (n in 0 until 430) vbr.record(n * 23_220L, if (n in 88..128) 1400 else 700)
+        assertTrue(vbr.kbpsAt(2500)!! > vbr.kbpsAt(7000)!! + 100)                    // the dense second really reads higher
+        assertNull(BitrateSeries().kbpsAt(1000))
+        assertTrue(cbr.recent(8000, 5).size == 5)
+    }
+
+    @Test fun crossfadeCurvesKeepLevelAndHitTheEnds() {
+        for (i in 0..10) {
+            val (inc, out) = CrossfadeCurve.gains(i / 10f, equalPower = true)
+            assertEquals(1.0, (inc * inc + out * out).toDouble(), 1e-5)               // equal power: constant loudness
+            val (li, lo) = CrossfadeCurve.gains(i / 10f, equalPower = false)
+            assertEquals(1.0, (li + lo).toDouble(), 1e-6)
+        }
+        assertEquals(0f, CrossfadeCurve.gains(0f, true).first, 1e-6f)
+        assertEquals(0f, CrossfadeCurve.gains(1f, true).second, 1e-6f)
+    }
+
+    @Test fun genreCloudDropsNoiseKeepsRealGenresAndAddsLocalOnes() {
+        val tags = CloudBuilder.build(listOf("rock" to 1000L, "seen live" to 900L, "electronic" to 100L, "2010" to 50L, "Favorites" to 40L))
+        val names = tags.map { it.name }
+        assertFalse("seen live" in names); assertFalse("2010" in names); assertFalse("favorites" in names)
+        assertTrue("rock" in names && "electronic" in names && "bollywood" in names && "sufi" in names)
+        assertEquals(1f, tags.first { it.name == "rock" }.weight, 1e-6f)
+        assertTrue(tags.all { it.weight in 0f..1f })
+        assertEquals(names, CloudBuilder.build(listOf("rock" to 1000L, "seen live" to 900L, "electronic" to 100L, "2010" to 50L, "Favorites" to 40L)).map { it.name })
+        assertTrue(CloudBuilder.sizeSp(1f) > CloudBuilder.sizeSp(0.2f))
     }
 }

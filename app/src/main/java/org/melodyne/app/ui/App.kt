@@ -3,6 +3,9 @@ package org.melodyne.app.ui
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -11,7 +14,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +66,7 @@ import org.melodyne.app.ui.home.HomeScreen
 import org.melodyne.app.ui.nowplaying.NowPlayingScreen
 import org.melodyne.app.ui.search.SearchScreen
 import org.melodyne.app.ui.settings.SettingsScreen
+import org.melodyne.app.ui.genre.GenreScreen
 import org.melodyne.app.ui.library.AddToPlaylistDialog
 import org.melodyne.app.ui.library.LibraryScreen
 
@@ -70,16 +78,19 @@ fun App(conn: PlayerConnection, openSignal: Int = 0) {
     var pickerSong by remember { mutableStateOf<Song?>(null) }
     var chainOpen by remember { mutableStateOf(false) }
     var easter by remember { mutableStateOf(false) }
+    var genre by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { ServiceLocator.updates.check(false) }
     val accent = rememberAccent(ps.artUrl)
+    val pb by ServiceLocator.playback.state.collectAsState()
     var handled by remember { mutableStateOf(0) }
     LaunchedEffect(openSignal, ps.hasItem) {
         if (openSignal > handled && ps.hasItem) { expanded = true; handled = openSignal }
     }
 
     CompositionLocalProvider(LocalAccent provides accent, LocalAddToPlaylist provides { song: Song -> pickerSong = song },
-        LocalOpenChain provides { chainOpen = true }, LocalOpenEaster provides { easter = true }) {
+        LocalOpenChain provides { chainOpen = true }, LocalOpenEaster provides { easter = true }, LocalOpenGenre provides { t: String -> genre = t }) {
         Box(Modifier.fillMaxSize().background(Amoled.Black)) {
+            if (pb.glow) AmbientGlow(accent)
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
                 Box(Modifier.weight(1f)) {
                     when (tab) {
@@ -100,6 +111,7 @@ fun App(conn: PlayerConnection, openSignal: Int = 0) {
             ) {
                 NowPlayingScreen(conn, ps, onClose = { expanded = false })
             }
+            genre?.let { g -> GenreScreen(g, conn) { genre = null } }
             pickerSong?.let { song -> AddToPlaylistDialog(song) { pickerSong = null } }
             if (chainOpen) ChainSheet { chainOpen = false }
             if (easter) EasterScreen { easter = false }
@@ -108,18 +120,24 @@ fun App(conn: PlayerConnection, openSignal: Int = 0) {
     BackHandler(enabled = expanded) { expanded = false }
 }
 
+/** Floating glass bar. The highlighted pill is one shape that springs to the chosen tab, with a little overshoot. */
 @Composable
 private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
     val accent = LocalAccent.current
-    Row(Modifier.fillMaxWidth().height(56.dp).background(Amoled.Black), horizontalArrangement = Arrangement.SpaceEvenly) {
-        listOf("Home", "Search", "AI Mix", "Library", "Settings").forEachIndexed { i, label ->
-            Column(
-                Modifier.weight(1f).fillMaxSize().clickable { onSelect(i) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Txt(label, size = 12.sp, weight = FontWeight.SemiBold, color = if (i == selected) accent else Amoled.Muted)
-                Box(Modifier.padding(top = 5.dp).size(5.dp).clip(CircleShape).background(if (i == selected) accent else Color.Transparent))
+    val labels = listOf("Home", "Search", "AI Mix", "Library", "Settings")
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp).height(58.dp).glass(RoundedCornerShape(30.dp), alpha = 0.08f, strong = true)) {
+        val tabW = maxWidth / labels.size
+        val x by animateDpAsState(tabW * selected, spring(dampingRatio = 0.58f, stiffness = Spring.StiffnessMediumLow), label = "pill")
+        Box(
+            Modifier.offset(x = x).width(tabW).fillMaxHeight().padding(5.dp)
+                .clip(RoundedCornerShape(26.dp)).background(accent.copy(alpha = 0.22f))
+                .border(1.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(26.dp)),
+        )
+        Row(Modifier.fillMaxSize()) {
+            labels.forEachIndexed { i, label ->
+                Box(Modifier.weight(1f).fillMaxHeight().clickable { onSelect(i) }, contentAlignment = Alignment.Center) {
+                    Txt(label, size = 12.sp, weight = FontWeight.SemiBold, color = if (i == selected) accent else Amoled.Muted)
+                }
             }
         }
     }
@@ -129,7 +147,7 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
 private fun MiniPlayer(ps: PlayerUiState, conn: PlayerConnection, onOpen: () -> Unit) {
     val accent = LocalAccent.current
     Row(
-        Modifier.fillMaxWidth().background(Amoled.Surface).clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp).glass(RoundedCornerShape(24.dp), alpha = 0.07f).clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Cover(ps.artUrl, Modifier.size(44.dp))

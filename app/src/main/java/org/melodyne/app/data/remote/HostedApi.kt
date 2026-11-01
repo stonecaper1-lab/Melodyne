@@ -14,16 +14,6 @@ interface HostedApi {
         @Query("page") page: Int, @Query("limit") limit: Int,
     ): Envelope<SearchData>
 
-    @GET suspend fun searchPlaylists(
-        @Url url: String, @Query("query") query: String,
-        @Query("page") page: Int, @Query("limit") limit: Int,
-    ): Envelope<PlaylistSearchData>
-
-    @GET suspend fun playlist(
-        @Url url: String, @Query("id") id: String,
-        @Query("page") page: Int, @Query("limit") limit: Int,
-    ): Envelope<PlaylistDto>
-
     /** Path may differ per server; adjust in HostedRepository.lyrics() if needed. */
     @GET suspend fun lyrics(@Url url: String): Envelope<LyricsDto>
 }

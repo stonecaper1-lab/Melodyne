@@ -44,12 +44,14 @@ val LocalAddToPlaylist = staticCompositionLocalOf<(Song) -> Unit> { {} }
 /** Provided by App: opens the signal-chain sheet / the hidden screen. */
 val LocalOpenChain = staticCompositionLocalOf<() -> Unit> { {} }
 val LocalOpenEaster = staticCompositionLocalOf<() -> Unit> { {} }
+/** Opens the page for a genre/tag. Used by the genre cloud and by the tags on Now Playing. */
+val LocalOpenGenre = staticCompositionLocalOf<(String) -> Unit> { {} }
 
 /** Rounded section card with an accent title. */
 @Composable
 fun Panel(title: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Amoled.Surface).padding(18.dp),
+        modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp), alpha = 0.07f).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (title != null) Txt(title, size = 17.sp, weight = FontWeight.Bold, color = LocalAccent.current)
@@ -60,12 +62,11 @@ fun Panel(title: String? = null, modifier: Modifier = Modifier, content: @Compos
 @Composable
 fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val accent = LocalAccent.current
+    val shape = RoundedCornerShape(50)
+    val base = if (selected) modifier.clip(shape).background(accent) else modifier.glass(shape, alpha = 0.08f)
     Txt(
         text,
-        modifier.clip(RoundedCornerShape(50))
-            .background(if (selected) accent else Amoled.SurfaceHi)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+        base.clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
         size = 13.sp, weight = FontWeight.SemiBold, color = if (selected) Color.Black else Amoled.OnBg,
     )
 }
@@ -89,7 +90,7 @@ fun Field(
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboard),
         modifier = modifier.fillMaxWidth().then(if (singleLine) Modifier else Modifier.heightIn(min = 96.dp))
-            .clip(RoundedCornerShape(14.dp)).background(Amoled.SurfaceHi).padding(16.dp),
+            .glass(RoundedCornerShape(16.dp), alpha = 0.05f).padding(16.dp),
         decorationBox = { inner ->
             Box {
                 if (value.isEmpty()) Txt(hint, color = Amoled.Muted, size = 16.sp, maxLines = 2)

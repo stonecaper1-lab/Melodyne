@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.CoroutineScope
@@ -30,17 +31,44 @@ import org.melodyne.app.di.ServiceLocator
 import java.io.File
 
 /**
- * Owns ExoPlayer + MediaSession. Media3 supplies the foreground notification, lock-screen and
- * Bluetooth controls. Stream-quality changes are broadcast to every connected MediaController
- * through session extras (see QualityMonitor / PlayerConnection).
+ * Owns ExoPlayer + MediaSession. Media3 supplies the foreground notification, lock-screen and Bluetooth controls.
+ * Stream quality is broadcast through session extras; every audio frame passes the BitrateMeter on its way in;
+ * the EQ and normaliser sit inside the audio sink; a helper player carries the outgoing song during a crossfade.
  */
 @UnstableApi
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private var cache: SimpleCache? = null
-    private val eqProcessor = EqProcessor()
+    private var engine: CrossfadeEngine? = null
+    private val eqProcessors = ArrayList<EqProcessor>()
     private val loudnessProcessor = LoudnessProcessor(ServiceLocator.normalizer)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private lateinit var dataSources: CacheDataSource.Factory
+    private val musicAttrs = AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).setUsage(C.USAGE_MEDIA).build()
+
+    private fun renderers(eq: EqProcessor, loudness: LoudnessProcessor?): DefaultRenderersFactory =
+        object : DefaultRenderersFactory(this@PlaybackService) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
+                DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(if (loudness != null) arrayOf<AudioProcessor>(loudness, eq) else arrayOf<AudioProcessor>(eq))
+                    .build()
+        }
+
+    private fun applyEq(p: EqProcessor) {
+        val e = ServiceLocator.eq.state.value
+        p.update(e.gains, e.enabled && !ServiceLocator.playback.state.value.audiophile)
+    }
+
+    private fun newTailPlayer(): ExoPlayer {
+        val eq = EqProcessor().also { eqProcessors += it; applyEq(it) }
+        return ExoPlayer.Builder(this, renderers(eq, null))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources))
+            .setAudioAttributes(musicAttrs, /* handleAudioFocus = */ false)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -48,26 +76,16 @@ class PlaybackService : MediaSessionService() {
             File(cacheDir, "audio"), LeastRecentlyUsedCacheEvictor(64L * 1024 * 1024), StandaloneDatabaseProvider(this),
         )
         cache = c
-        val dataSources = CacheDataSource.Factory()
+        dataSources = CacheDataSource.Factory()
             .setCache(c)
             .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(ServiceLocator.http))
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
-        // Our own 7-band EQ sits in the audio sink; nothing is attached to the device's effect chain.
-        val renderers = object : DefaultRenderersFactory(this) {
-            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
-                DefaultAudioSink.Builder(context)
-                    .setEnableFloatOutput(enableFloatOutput)
-                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(arrayOf<AudioProcessor>(loudnessProcessor, eqProcessor))
-                    .build()
-        }
-        val player = ExoPlayer.Builder(this, renderers)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources))
-            .setAudioAttributes(
-                AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).setUsage(C.USAGE_MEDIA).build(),
-                /* handleAudioFocus = */ true,
-            )
+        val eqMain = EqProcessor().also { eqProcessors += it }
+        val extractors = MeteringExtractorsFactory(DefaultExtractorsFactory(), ServiceLocator.bitrate)
+        val player = ExoPlayer.Builder(this, renderers(eqMain, loudnessProcessor))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources, extractors))
+            .setAudioAttributes(musicAttrs, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
@@ -84,10 +102,12 @@ class PlaybackService : MediaSessionService() {
         session = s
         QualityMonitor(player) { q -> s.setSessionExtras(q.toBundle()) }.attach()
         Scrobbling(player, scope, ServiceLocator.lastFm).attach()
+        engine = CrossfadeEngine(player, { newTailPlayer() }, ServiceLocator.playback, ServiceLocator.normalizer, scope).also { it.attach() }
+
         // Audiophile Mode bypasses every processor; otherwise the EQ and normalisation follow the user's settings.
         scope.launch {
             combine(ServiceLocator.eq.state, ServiceLocator.playback.state) { e, p -> e to p }.collect { (e, p) ->
-                eqProcessor.update(e.gains, e.enabled && !p.audiophile)
+                eqProcessors.forEach { it.update(e.gains, e.enabled && !p.audiophile) }
                 ServiceLocator.normalizer.enabled = p.normalizeEffective
                 OutputInspector.applyBitPerfect(this@PlaybackService, p.audiophile)
             }
@@ -109,6 +129,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        engine?.release()
+        engine = null
         session?.run { player.release(); release() }
         session = null
         cache?.release()

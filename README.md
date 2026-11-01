@@ -35,6 +35,13 @@ if the APK is 5,000,000 bytes or larger. Local: `gradle :app:assembleRelease` (G
   faded in and remembered per song. Gapless is automatic when files declare delay/padding. Crossfade is planned (needs a second decoder).
 - **Updates**: the app checks the latest GitHub release at most every 6 hours and shows a banner; nothing installs automatically.
 
+## Look and feel, bitrate, endless play
+- **Liquid glass** (`ui/Glass.kt`): `glass()` and `glassSheet()` modifiers, `AmbientGlow`, a springy glass nav bar. Glow is optional.
+- **Live bitrate** (`player/BitrateMeter.kt`): a wrapper around ExoPlayer's extractors records every audio frame's size and timestamp.
+  kbps at any second = bytes in that second x 8. Idempotent, so seeking never double-counts.
+- **Infinite play** (`data/repo/InfiniteService.kt`) and **genre cloud** (`data/repo/GenreService.kt`) both lean on Last.fm.
+- **Crossfade** (`player/CrossfadeEngine.kt`): a helper "tail" player carries the outgoing song while the main player starts the next.
+
 ## Releases
 Uploading `melodyne-source.zip` makes the workflow commit the real source as "Melodyne vX.Y.Z", build, and publish a release with
 the notes from the top of CHANGELOG.md. The newest APK is always at `releases/latest/download/melodyne.apk`.

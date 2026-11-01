@@ -63,6 +63,7 @@ import org.melodyne.app.ui.SkeletonRow
 import org.melodyne.app.ui.SongRow
 import org.melodyne.app.ui.Txt
 import org.melodyne.app.ui.fmtSec
+import org.melodyne.app.ui.glass
 
 private fun greeting(): String {
     val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
@@ -117,8 +118,8 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
                     )
                 }
                 Txt(
-                    "Search songs, artists, albums…", size = 15.sp, color = Amoled.Muted,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).border(1.dp, Amoled.SurfaceHi, RoundedCornerShape(50))
+                    "Search songs, artists, genres…", size = 15.sp, color = Amoled.Muted,
+                    modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(50), alpha = 0.06f)
                         .clickable(onClick = onOpenSearch).padding(horizontal = 18.dp, vertical = 14.dp),
                 )
             }
@@ -192,24 +193,6 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
         item { SectionTitle(s.trendingTitle) }
         if (s.loading && s.trending.isEmpty()) items(6) { SkeletonRow() }
         itemsIndexed(s.trending.take(10)) { i, song -> ChartRow(i + 1, song, accent) { conn.play(s.trending, i) } }
-
-        if (s.playlists.isNotEmpty()) {
-            item { SectionTitle("Playlists") }
-            item {
-                LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(s.playlists) { pl ->
-                        Row(
-                            Modifier.width(240.dp).height(72.dp).clip(RoundedCornerShape(18.dp)).background(Amoled.Surface)
-                                .clickable { vm.playPlaylist(pl.id) { songs -> conn.play(songs, 0) } }.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Cover(pl.artUrl, Modifier.size(52.dp), radius = 12.dp)
-                            Txt(pl.name, Modifier.padding(start = 12.dp), size = 14.sp, weight = FontWeight.SemiBold, maxLines = 2)
-                        }
-                    }
-                }
-            }
-        }
 
         if (s.trending.size > 10) {
             item { SectionTitle("More to explore") }

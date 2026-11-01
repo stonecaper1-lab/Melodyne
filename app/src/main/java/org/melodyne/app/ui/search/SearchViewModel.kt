@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.melodyne.app.data.repo.ApiUnavailable
+import org.melodyne.app.data.repo.CloudTag
+import org.melodyne.app.data.repo.GenreService
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.MusicRepository
 import org.melodyne.app.domain.Song
@@ -21,18 +23,21 @@ data class SearchUi(
     val results: List<Song> = emptyList(),
     val error: String? = null,
     val searched: Boolean = false,
+    val cloud: List<CloudTag> = emptyList(),
 )
 
-class SearchViewModel(private val repo: MusicRepository) : ViewModel() {
+class SearchViewModel(private val repo: MusicRepository, private val genres: GenreService) : ViewModel() {
     private val _ui = MutableStateFlow(SearchUi())
     val ui = _ui.asStateFlow()
     private var job: Job? = null
+
+    init { viewModelScope.launch { val c = runCatching { genres.cloud() }.getOrDefault(emptyList()); _ui.update { it.copy(cloud = c) } } }
 
     /** Debounced search-as-you-type. */
     fun onQuery(q: String) {
         _ui.update { it.copy(query = q) }
         job?.cancel()
-        if (q.isBlank()) { _ui.update { SearchUi() }; return }
+        if (q.isBlank()) { _ui.update { SearchUi(cloud = it.cloud) }; return }
         job = viewModelScope.launch { delay(350); run(q) }
     }
 
@@ -53,6 +58,6 @@ class SearchViewModel(private val repo: MusicRepository) : ViewModel() {
     }
 
     companion object {
-        val Factory = viewModelFactory { initializer { SearchViewModel(ServiceLocator.repo) } }
+        val Factory = viewModelFactory { initializer { SearchViewModel(ServiceLocator.repo, ServiceLocator.genres) } }
     }
 }

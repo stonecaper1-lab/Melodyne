@@ -24,13 +24,4 @@ data class SongDto(
 
 @Serializable data class SearchData(val results: List<SongDto> = emptyList())
 
-@Serializable
-data class PlaylistDto(
-    val id: String = "",
-    val name: String = "",
-    val image: List<UrlDto> = emptyList(),
-    val songs: List<SongDto> = emptyList(),
-)
-
-@Serializable data class PlaylistSearchData(val results: List<PlaylistDto> = emptyList())
 @Serializable data class LyricsDto(val lyrics: String? = null, val snippet: String? = null)

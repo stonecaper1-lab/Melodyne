@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -28,8 +29,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.roundToInt
 import org.melodyne.app.BuildConfig
 import org.melodyne.app.di.ServiceLocator
+import org.melodyne.app.ui.AccentSlider
 import org.melodyne.app.ui.Amoled
 import org.melodyne.app.ui.Chip
 import org.melodyne.app.ui.Field
@@ -94,16 +97,51 @@ fun SettingsScreen() {
                     "(about the first 8 seconds, to −14 LUFS), then remembered for that song. Applied to the decoded audio only; nothing is re-encoded.",
                 size = 12.sp, color = Amoled.Muted, maxLines = 6,
             )
-            ToggleRow("Gapless", "Songs that declare their encoder delay and padding join without a gap, automatically.", "Always on", true) {}
+            ToggleRow(
+                "Gapless",
+                if (pb.crossfadeEffective) "Paused while Crossfade is on." else "Songs that declare their encoder delay and padding join without a gap, automatically.",
+                if (pb.crossfadeEffective) "Paused" else "Always on", !pb.crossfadeEffective,
+            ) {}
             ToggleRow(
                 "Crossfade",
-                if (pb.audiophile) "Disabled in Audiophile Mode to preserve transparent chain."
-                else "Needs a second decoder running at once, so it isn't bit-transparent. Arrives in the next build.",
-                "Next build", false,
-            ) {}
+                when {
+                    pb.audiophile -> "Disabled in Audiophile Mode to preserve transparent chain."
+                    pb.crossfade -> "Fades ${pb.crossfadeSec} s between songs. Crossfade decodes two AAC streams at once + DSP mix - not bit-transparent."
+                    else -> "Blends the end of one song into the next."
+                },
+                if (pb.crossfadeEffective) "On" else "Off", pb.crossfadeEffective,
+            ) { if (!pb.audiophile) playback.setCrossfade(!pb.crossfade) }
+            if (pb.crossfade && !pb.audiophile) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Txt("${pb.crossfadeSec} s", Modifier.width(40.dp), size = 14.sp, weight = FontWeight.SemiBold)
+                    AccentSlider((pb.crossfadeSec - 1) / 11f, { v -> playback.setCrossfadeSec(1 + (v * 11).roundToInt()) }, Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("Equal-power", pb.equalPower) { playback.setEqualPower(true) }
+                    Chip("Linear", !pb.equalPower) { playback.setEqualPower(false) }
+                }
+                Txt("The fade starts at a song's natural end. Skipping cuts cleanly. Not used on the last song or in repeat-one.", size = 12.sp, color = Amoled.Muted, maxLines = 3)
+            }
+            ToggleRow(
+                "Infinite play", "When the queue is nearly done, similar songs are added automatically so the music never stops.",
+                if (pb.infinite) "On" else "Off", pb.infinite,
+            ) { playback.setInfinite(!pb.infinite) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Txt("Profile", size = 13.sp, color = Amoled.Muted)
+                Chip("Normal", !pb.audiophile && !pb.crossfade) { playback.preset("normal") }
+                Chip("Audiophile", pb.audiophile) { playback.preset("audiophile") }
+                Chip("Party", !pb.audiophile && pb.crossfade) { playback.preset("party") }
+            }
             Pill("Bluetooth volume: Developer options", filled = false) {
                 runCatching { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
             }
+        }
+
+        Panel("Appearance") {
+            ToggleRow(
+                "Liquid glow", "Soft colour drifting behind the glass, and the blurred artwork on Now Playing. Off gives pure AMOLED black.",
+                if (pb.glow) "On" else "Off", pb.glow,
+            ) { playback.setGlow(!pb.glow) }
         }
 
         Panel("Last.fm") {
