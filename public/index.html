@@ -4,58 +4,39 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Melodyne is a tiny, free-software music player for Android." />
-  <title>Melodyne — music, with room to breathe</title>
+  <title>Melodyne — a proper music player</title>
   <style>
-    :root { --ink:#f4f1ea; --muted:#aaa9a3; --bg:#0b0c0e; --panel:#15171a; --line:#2a2d31; --lime:#c8f56a; --orange:#ff956b; }
-    * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    body { margin:0; color:var(--ink); background:var(--bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.5; }
-    a { color:inherit; text-decoration:none; }
-    .wrap { max-width:1120px; margin:auto; padding:0 28px; }
-    nav { display:flex; align-items:center; justify-content:space-between; padding:26px 0; }
-    .brand { display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:-.03em; font-size:20px; }
-    .mark { display:flex; align-items:center; gap:3px; height:24px; }
-    .mark i { display:block; width:4px; border-radius:5px; background:var(--lime); }
-    .mark i:nth-child(1){height:11px}.mark i:nth-child(2){height:20px}.mark i:nth-child(3){height:15px}.mark i:nth-child(4){height:23px}
-    .navlinks { display:flex; gap:28px; color:var(--muted); font-size:14px; }
-    .navlinks a:hover { color:var(--ink); }
-    .hero { min-height:650px; display:grid; grid-template-columns:1.05fr .95fr; gap:70px; align-items:center; padding:65px 0 100px; }
-    .eyebrow { color:var(--lime); text-transform:uppercase; letter-spacing:.16em; font-size:11px; font-weight:800; }
-    h1 { font-size:clamp(48px, 7vw, 86px); line-height:.96; letter-spacing:-.075em; margin:20px 0 28px; max-width:650px; }
-    h1 em { color:var(--lime); font-style:normal; }
-    .lede { max-width:500px; color:var(--muted); font-size:18px; margin-bottom:34px; }
-    .actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
-    .button { display:inline-flex; align-items:center; gap:10px; padding:13px 18px; border:1px solid var(--line); border-radius:8px; font-weight:750; font-size:14px; }
-    .button.primary { background:var(--lime); color:#15180d; border-color:var(--lime); }
-    .button:hover { transform:translateY(-1px); }
-    .visual { position:relative; min-height:410px; display:grid; place-items:center; }
-    .orb { width:min(365px, 80vw); aspect-ratio:1; border-radius:50%; background:radial-gradient(circle at 35% 30%, #f4ffbf 0 4%, #c8f56a 13%, #8aa94c 37%, #252b1c 68%, #10120e 100%); box-shadow:0 0 0 1px #515f36, 0 0 80px #9bc25233, inset -35px -30px 50px #0009; }
-    .orbit { position:absolute; width:105%; aspect-ratio:1; border:1px solid #555b4e; border-radius:50%; transform:rotate(-18deg); }
-    .orbit:after { content:""; position:absolute; width:9px; height:9px; border-radius:50%; background:var(--orange); top:13%; right:16%; box-shadow:0 0 22px var(--orange); }
-    .player-card { position:absolute; width:205px; bottom:20px; left:4%; padding:16px; border:1px solid #ffffff1c; border-radius:12px; background:#1b1d1fcc; backdrop-filter:blur(14px); box-shadow:0 18px 35px #0008; }
-    .mini-label { color:var(--muted); text-transform:uppercase; letter-spacing:.12em; font-size:9px; }
-    .song { margin:12px 0 4px; font-weight:800; font-size:15px; }.artist { color:var(--muted); font-size:12px; }
-    .bars { display:flex; align-items:center; gap:3px; height:28px; margin-top:14px; }.bars i { width:3px; border-radius:3px; background:var(--lime); }.bars i:nth-child(1){height:10px}.bars i:nth-child(2){height:22px}.bars i:nth-child(3){height:15px}.bars i:nth-child(4){height:26px}.bars i:nth-child(5){height:18px}.bars i:nth-child(6){height:11px}
-    section { padding:94px 0; border-top:1px solid var(--line); }
-    .section-head { display:flex; justify-content:space-between; align-items:end; gap:28px; margin-bottom:34px; }.section-head h2 { font-size:42px; line-height:1; letter-spacing:-.06em; margin:12px 0 0; }.section-head p { color:var(--muted); max-width:360px; margin:0; }
-    .features { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }.feature { min-height:205px; padding:25px; background:var(--panel); border:1px solid var(--line); border-radius:12px; }.feature strong { display:block; font-size:18px; margin:38px 0 9px; }.feature p { color:var(--muted); font-size:14px; margin:0; }.num { color:var(--orange); font-family:ui-monospace, monospace; font-size:12px; }
-    .manifesto { display:grid; grid-template-columns:1fr 1fr; gap:70px; align-items:start; }.manifesto h2 { font-size:clamp(35px, 5vw, 60px); letter-spacing:-.07em; line-height:1; margin:0; }.manifesto p { color:var(--muted); font-size:17px; margin:0; }.stack { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:28px; }.pill { padding:12px 14px; border:1px solid var(--line); border-radius:7px; color:#d7d6d0; font-size:13px; }
-    footer { display:flex; justify-content:space-between; color:var(--muted); font-size:13px; padding:28px 0 42px; }
-    @media (max-width:760px){ .navlinks{display:none}.hero,.manifesto{grid-template-columns:1fr;gap:35px;padding-top:40px}.hero{padding-bottom:75px}.visual{min-height:350px}.features{grid-template-columns:1fr}.section-head{display:block}.section-head p{margin-top:18px}.player-card{left:0}.orb{width:300px}footer{display:block}footer span{display:block;margin-top:8px} }
+    :root { --chrome:#bfc0c4; --chrome-hi:#e9e9eb; --chrome-lo:#62636a; --ink:#111216; --lcd:#8aa58a; --lcd-dark:#142016; --blue:#182d74; --blue-hi:#3150a7; --yellow:#f1d64b; }
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;color:var(--ink);background:#27282d;font-family:Arial,Helvetica,sans-serif;font-size:13px}
+    a{color:inherit;text-decoration:none}.wrap{max-width:980px;margin:auto;padding:22px 18px 50px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;color:#ddd;margin-bottom:16px;font:11px 'Courier New',monospace;letter-spacing:.08em}.topbar a:hover{color:var(--yellow)}
+    .winamp{background:var(--chrome);border:2px solid #0a0a0b;box-shadow:4px 5px 0 #101115, inset 1px 1px var(--chrome-hi), inset -1px -1px var(--chrome-lo)}
+    .titlebar{height:27px;display:flex;align-items:center;justify-content:space-between;padding:0 7px;color:#fff;background:linear-gradient(90deg,var(--blue),var(--blue-hi));font-weight:bold;font-size:12px;letter-spacing:.02em}.titlebar b{font-size:11px}.window-buttons{display:flex;gap:4px}.window-buttons i{display:grid;place-items:center;width:15px;height:13px;color:#111;background:var(--chrome);border:1px solid #111;font-style:normal;font-size:10px;line-height:1}
+    .main{padding:14px}.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;align-items:stretch}.lcd{background:var(--lcd-dark);border:3px inset #777;padding:20px;color:var(--lcd);font-family:'Courier New',monospace;text-shadow:0 0 7px #8aa58a88;min-height:250px}.lcd .kicker{font-size:11px;color:#d3e7a2;letter-spacing:.14em}.lcd h1{font-size:clamp(38px,7vw,72px);line-height:.82;letter-spacing:-.1em;margin:28px 0 22px;color:#b6ca93}.lcd h1 span{color:var(--yellow)}.lcd p{max-width:440px;line-height:1.6;color:#9fba9e;margin:0}.spectrum{display:flex;align-items:end;gap:4px;height:42px;margin-top:22px}.spectrum i{display:block;width:9px;background:var(--yellow);box-shadow:0 0 5px #d8cf4f88}.spectrum i:nth-child(1){height:14px}.spectrum i:nth-child(2){height:33px}.spectrum i:nth-child(3){height:25px}.spectrum i:nth-child(4){height:40px}.spectrum i:nth-child(5){height:20px}.spectrum i:nth-child(6){height:30px}.spectrum i:nth-child(7){height:16px}.spectrum i:nth-child(8){height:37px}.spectrum i:nth-child(9){height:24px}
+    .display{background:#10140f;border:3px inset #777;padding:15px;color:#a9cda3;font:12px 'Courier New',monospace}.display h2{font-size:18px;color:#d7e7ad;margin:5px 0 15px}.time{font-size:31px;color:#d8dc91;text-align:right}.progress{height:9px;background:#263426;border:1px solid #70816c;margin:15px 0}.progress b{display:block;width:58%;height:100%;background:#aac36e}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;color:#819982;font-size:11px}.meta strong{display:block;color:#c4d6ae;font-weight:normal;margin-top:2px}
+    .controls{display:flex;gap:7px;margin-top:12px}.controls button,.button{font:700 12px Arial;padding:7px 12px;color:#111;background:linear-gradient(#f6f6f6,#9b9ca1);border:2px outset #eee;cursor:pointer}.controls button:active,.button:active{border-style:inset}.controls button:first-child{color:#fff;background:linear-gradient(#3c56a0,#172e72)}
+    .below{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.panel{background:#aeb0b4;border:2px inset #eee;padding:10px}.panel h2{font-size:13px;color:#fff;background:linear-gradient(90deg,var(--blue),var(--blue-hi));margin:-10px -10px 10px;padding:5px 7px}.features{display:grid;gap:8px}.feature{display:grid;grid-template-columns:30px 1fr;gap:8px;align-items:start;border-bottom:1px dotted #67686d;padding:4px 0 8px}.feature:last-child{border:0;padding-bottom:0}.num{font:bold 11px 'Courier New',monospace;color:#fff;background:#4d4e54;padding:5px 3px;text-align:center}.feature strong{font-size:13px}.feature p{font-size:12px;margin:3px 0 0;color:#414247;line-height:1.4}.download{display:flex;flex-direction:column;justify-content:space-between;min-height:190px}.download p{line-height:1.55;margin:0 0 16px}.button{display:inline-block;text-align:center}.button.primary{color:#fff;background:linear-gradient(#4965b8,#172e72);border-color:#d9d9db;text-shadow:1px 1px #111}.button.primary:hover{filter:brightness(1.15)}.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}.tag{font:11px 'Courier New',monospace;background:#d3d4d7;border:1px solid #777;padding:4px 6px}
+    footer{display:flex;justify-content:space-between;color:#999;margin-top:15px;font:11px 'Courier New',monospace}footer a:hover{color:var(--yellow)}
+    @media(max-width:700px){.hero,.below{grid-template-columns:1fr}.wrap{padding:12px 8px 34px}.main{padding:9px}.lcd h1{font-size:54px}.topbar{align-items:flex-start;gap:12px;flex-direction:column}footer{gap:8px;flex-direction:column}}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <nav><a class="brand" href="#top"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>melodyne</a><div class="navlinks"><a href="#features">Features</a><a href="#principles">Principles</a><a href="https://github.com/stonecaper1-lab/Melodyne">GitHub ↗</a></div></nav>
-    <main id="top">
-      <section class="hero" style="border-top:0;padding-top:40px">
-        <div><div class="eyebrow">Free software · Android</div><h1>Music, with room to <em>breathe.</em></h1><p class="lede">A tiny, thoughtful music player for people who care about the signal, the interface, and what happens between the notes.</p><div class="actions"><a class="button primary" href="https://github.com/stonecaper1-lab/Melodyne/releases/latest/download/melodyne.apk" download>Download latest release ↗</a><a class="button" href="https://github.com/stonecaper1-lab/Melodyne">Explore the source ↗</a></div></div>
-        <div class="visual" aria-label="Abstract equalizer illustration"><div class="orbit"></div><div class="orb"></div><div class="player-card"><div class="mini-label">Now playing</div><div class="song">A Walk Around</div><div class="artist">Tycho · 320 kbps AAC</div><div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
-      </section>
-      <section id="features"><div class="section-head"><div><div class="eyebrow">The essentials</div><h2>Quietly powerful.</h2></div><p>Everything you need to listen deeply. Nothing you do not.</p></div><div class="features"><article class="feature"><span class="num">01 / AUDIO</span><strong>Signal-first playback</strong><p>High-bitrate streams, gapless playback, live bitrate inspection, and an honest quality badge.</p></article><article class="feature"><span class="num">02 / CONTROL</span><strong>An EQ that behaves</strong><p>Seven precise bands with automatic headroom. Pure curves, no clipping, no mystery.</p></article><article class="feature"><span class="num">03 / OWNERSHIP</span><strong>Your library, yours</strong><p>Playlists export as JSON. No ads, analytics, Firebase, or Google Play Services.</p></article></div></section>
-      <section id="principles"><div class="manifesto"><h2>Built for the<br><em>long listen.</em></h2><div><p>Melodyne is free software with a small footprint and a large opinion: a music player should get out of the way. The code is open, the trade-offs are documented, and the experience is made for headphones.</p><div class="stack"><div class="pill">Kotlin + Compose</div><div class="pill">Media3 / ExoPlayer</div><div class="pill">No ads or tracking</div><div class="pill">Apache-2.0 licensed</div></div></div></div></section>
-    </main>
-    <footer><span>© Melodyne open-source project</span><span>Made for Android listeners.</span></footer>
+    <div class="topbar"><span>MELODYNE // FREE SOFTWARE FOR ANDROID</span><span><a href="#features">FEATURES</a> · <a href="https://github.com/stonecaper1-lab/Melodyne">SOURCE</a></span></div>
+    <div class="winamp">
+      <div class="titlebar"><span>melodyne.exe — the proper music player</span><span class="window-buttons"><i>_</i><i>□</i><i>×</i></span></div>
+      <main class="main">
+        <section class="hero">
+          <div class="lcd"><div class="kicker">NOW LOADING: YOUR LIBRARY</div><h1>Music.<br><span>Rewound.</span></h1><p>A tiny, thoughtful Android music player for people who remember when software had character — and playlists stayed on your device.</p><div class="spectrum" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          <div class="display"><div>MELODYNE PLAYLIST</div><h2>A Walk Around</h2><div class="time">02:41</div><div class="progress"><b></b></div><div class="meta"><div>ARTIST<strong>Tycho</strong></div><div>QUALITY<strong>320 kbps AAC</strong></div><div>ALBUM<strong>Awake</strong></div><div>MODE<strong>Gapless</strong></div></div><div class="controls"><button type="button" aria-label="Previous track">|◀</button><button type="button" aria-label="Play">▶</button><button type="button" aria-label="Next track">▶|</button></div></div>
+        </section>
+        <section class="below" id="features">
+          <div class="panel"><h2>FEATURES.TXT</h2><div class="features"><article class="feature"><span class="num">01</span><div><strong>Signal-first playback</strong><p>High-bitrate streams, gapless playback, and an honest quality badge.</p></div></article><article class="feature"><span class="num">02</span><div><strong>An EQ that behaves</strong><p>Seven precise bands with automatic headroom. No clipping, no mystery.</p></div></article><article class="feature"><span class="num">03</span><div><strong>Your library, yours</strong><p>JSON playlist export. No ads, analytics, Firebase, or Play Services.</p></div></article></div></div>
+          <div class="panel download"><div><h2>GET_MELODYNE.EXE</h2><p>Bring back the satisfying click of a proper desktop player — now in your pocket. Open source, Apache-2.0 licensed, built with Kotlin and Compose.</p></div><div><a class="button primary" href="https://github.com/stonecaper1-lab/Melodyne/releases/latest/download/melodyne.apk" download>DOWNLOAD LATEST RELEASE</a><div class="tags"><span class="tag">KOTLIN + COMPOSE</span><span class="tag">MEDIA3</span><span class="tag">NO TRACKING</span></div></div></div>
+        </section>
+      </main>
+    </div>
+    <footer><span>© MELODYNE OPEN-SOURCE PROJECT</span><a href="https://github.com/stonecaper1-lab/Melodyne">VIEW ON GITHUB ↗</a></footer>
   </div>
 </body>
 </html>
