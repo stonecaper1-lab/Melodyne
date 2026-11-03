@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.0
+- Welcome tour: shown once on every install (including updates), explains Audiophile Mode, the sound tools and what is different here; replay it from Settings > Appearance.
+- Fidelity: dithered 16-bit output, stereo width and a Car & Bluetooth curve and profile, gentle (reduce-only) normalisation, a dynamics readout (PLR) in the signal chain, and Bluetooth/car guidance.
+- Skins that do real work: Classic Amp, Cassette and Receiver, with a live 16-band spectrum, VU needles from the real levels, lamps that reflect the real state, working volume, balance, knob, tuning dial and hold-to-scrub.
+- Artist pages with Songs, Albums, Similar and About; every credited artist on Now Playing is tappable.
+- Top 10 in 18 languages, refreshed through the day (3-hour cache), with arrows for what moved.
+- Queue view on Now Playing.
+
 ## v0.6.1
 - Now Playing has a ••• menu: Go to album (full track list), Go to composer (credits, Last.fm bio and genres, songs), Add to playlist, Signal chain.
 - Now Playing layout: the title, artist and genre tags sit right under the artwork, and the bitrate pill sits just above the progress bar.

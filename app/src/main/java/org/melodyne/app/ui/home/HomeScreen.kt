@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import org.melodyne.app.data.repo.ChartService
 import org.melodyne.app.data.repo.MoodService
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.Song
@@ -190,9 +191,14 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
             item { SquareRail(s.because) { i -> conn.play(s.because, i) } }
         }
 
-        item { SectionTitle(s.trendingTitle) }
-        if (s.loading && s.trending.isEmpty()) items(6) { SkeletonRow() }
-        itemsIndexed(s.trending.take(10)) { i, song -> ChartRow(i + 1, song, accent) { conn.play(s.trending, i) } }
+        item { SectionTitle("Top 10") }
+        item {
+            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(ChartService.LANGS) { l -> Chip(l.label, s.chartLang == l.label) { vm.selectLang(l.label) } }
+            }
+        }
+        if ((s.loading || s.chartLoading) && s.trending.isEmpty()) items(6) { SkeletonRow() }
+        itemsIndexed(s.trending.take(10)) { i, song -> ChartRow(i + 1, song, accent, s.moves[song.id].orEmpty()) { conn.play(s.trending, i) } }
 
         if (s.trending.size > 10) {
             item { SectionTitle("More to explore") }
@@ -248,13 +254,19 @@ private fun HeroCard(song: Song, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun ChartRow(rank: Int, song: Song, accent: Color, onClick: () -> Unit) {
+private fun ChartRow(rank: Int, song: Song, accent: Color, move: String, onClick: () -> Unit) {
     val addToPlaylist = LocalAddToPlaylist.current
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Txt("%02d".format(rank), Modifier.width(40.dp), size = 20.sp, weight = FontWeight.Black, color = if (rank <= 3) accent else Color(0xFF4A4A4A))
+        Column(Modifier.width(44.dp)) {
+            Txt("%02d".format(rank), size = 20.sp, weight = FontWeight.Black, color = if (rank <= 3) accent else Color(0xFF4A4A4A))
+            if (move.isNotEmpty()) Txt(
+                move, size = 10.sp, weight = FontWeight.Bold,
+                color = when { move.startsWith("▲") -> Amoled.Ok; move.startsWith("▼") -> Amoled.Err; move == "NEW" -> accent; else -> Amoled.Muted },
+            )
+        }
         Cover(song.thumbUrl, Modifier.size(48.dp), radius = 24.dp)
         Column(Modifier.weight(1f).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Txt(song.title, size = 16.sp, weight = FontWeight.Medium)

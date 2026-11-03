@@ -204,6 +204,14 @@ class PlayerConnection(private val app: Context) {
         }
     }
 
+    /** The current queue and the index of the song playing now. */
+    fun queue(): Pair<List<Song>, Int> {
+        val c = controller ?: return emptyList<Song>() to 0
+        return (0 until c.mediaItemCount).mapNotNull { c.getMediaItemAt(it).toSong() } to c.currentMediaItemIndex
+    }
+
+    fun jumpTo(index: Int) { controller?.let { it.seekToDefaultPosition(index); it.play() } }
+
     fun toggle() { controller?.let { if (it.isPlaying) it.pause() else it.play() } }
     fun next() { controller?.seekToNextMediaItem() }
     fun prev() { controller?.let { if (it.currentPosition > 3_000) it.seekTo(0) else it.seekToPreviousMediaItem() } }

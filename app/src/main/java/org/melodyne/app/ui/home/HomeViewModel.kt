@@ -14,8 +14,8 @@ import org.melodyne.app.data.lastfm.EnrichmentService
 import org.melodyne.app.data.local.LibraryStore
 import org.melodyne.app.data.local.RecentStore
 import org.melodyne.app.data.repo.ApiUnavailable
+import org.melodyne.app.data.repo.ChartService
 import org.melodyne.app.data.repo.MoodService
-import org.melodyne.app.data.repo.TrackResolver
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.MusicRepository
 import org.melodyne.app.domain.Song
@@ -23,8 +23,12 @@ import org.melodyne.app.domain.TitleText
 
 data class HomeUi(
     val loading: Boolean = true,
+    val chartLang: String = "All",
+    val chartLoading: Boolean = false,
+    /** The chart for [chartLang]: the first ten are the Top 10, the rest feed "More to explore". */
     val trending: List<Song> = emptyList(),
-    val trendingTitle: String = "Chart",
+    /** song id -> "NEW" / "▲2" / "▼1" / "–" */
+    val moves: Map<String, String> = emptyMap(),
     val recents: List<Song> = emptyList(),
     val onRepeat: List<Song> = emptyList(),
     val becauseArtist: String? = null,
@@ -39,17 +43,19 @@ class HomeViewModel(
     private val recents: RecentStore,
     private val library: LibraryStore,
     private val enrich: EnrichmentService,
-    private val resolver: TrackResolver,
+    private val charts: ChartService,
     private val moods: MoodService,
 ) : ViewModel() {
     private val _ui = MutableStateFlow(HomeUi(recents = recents.all(), lastFmReady = enrich.available))
     val ui = _ui.asStateFlow()
+    private var chartAt = 0L
 
     init { load() }
 
-    /** Called every time Home is shown: history-based rows update as you listen. */
+    /** Called every time Home is shown: history rows update as you listen, and a chart older than 30 minutes is fetched again. */
     fun refreshPersonal() {
         _ui.update { it.copy(recents = recents.all(), lastFmReady = enrich.available) }
+        if (chartAt != 0L && System.currentTimeMillis() - chartAt > 30 * 60_000L) viewModelScope.launch { loadChart() }
         val stats = library.data.value.stats
         val now = System.currentTimeMillis()
         val repeat = stats.filter { it.plays >= 2 && now - it.last < 30L * 86_400_000L }
@@ -76,27 +82,32 @@ class HomeViewModel(
     fun load() {
         _ui.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
-            val chart = async { runCatching { trending() } }
-            val c = chart.await()
-            _ui.update {
-                it.copy(
-                    loading = false,
-                    trending = c.getOrNull()?.second ?: it.trending,
-                    trendingTitle = c.getOrNull()?.first ?: it.trendingTitle,
-                    error = c.exceptionOrNull()?.let { e -> (e as? ApiUnavailable)?.userMessage ?: "Something went wrong." },
-                )
-            }
+            loadChart()
+            _ui.update { it.copy(loading = false) }
             refreshPersonal()
         }
     }
 
-    /** With a Last.fm key the chart is what India is actually listening to, matched to the catalogue; otherwise a plain search. */
-    private suspend fun trending(): Pair<String, List<Song>> {
-        if (enrich.available) {
-            val songs = resolver.resolve(enrich.geoTopTracks("india", 25))
-            if (songs.size >= 6) return "Trending in India" to songs
-        }
-        return "Chart" to repo.search("top hits")
+    fun selectLang(label: String) {
+        if (label == _ui.value.chartLang) return
+        _ui.update { it.copy(chartLang = label, trending = emptyList(), moves = emptyMap()) }
+        viewModelScope.launch { loadChart() }
+    }
+
+    private suspend fun loadChart() {
+        val lang = _ui.value.chartLang
+        _ui.update { it.copy(chartLoading = true) }
+        runCatching { charts.top(lang) }
+            .onSuccess { c ->
+                chartAt = System.currentTimeMillis()
+                _ui.update { s ->
+                    if (s.chartLang != lang) s
+                    else s.copy(chartLoading = false, trending = c.map { it.song }, moves = c.associate { it.song.id to it.move }, error = null)
+                }
+            }
+            .onFailure { e ->
+                _ui.update { it.copy(chartLoading = false, error = (e as? ApiUnavailable)?.userMessage ?: "Something went wrong.") }
+            }
     }
 
     fun playMood(label: String, onReady: (List<Song>) -> Unit) {
@@ -116,7 +127,7 @@ class HomeViewModel(
             initializer {
                 HomeViewModel(
                     ServiceLocator.repo, ServiceLocator.recents, ServiceLocator.library,
-                    ServiceLocator.enrichment, ServiceLocator.resolver, ServiceLocator.moods,
+                    ServiceLocator.enrichment, ServiceLocator.charts, ServiceLocator.moods,
                 )
             }
         }

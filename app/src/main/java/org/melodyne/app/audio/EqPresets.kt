@@ -15,6 +15,7 @@ object EqPresets {
         EqPreset("unplugged", "Unplugged", "Woody body for guitar, ghazal and acoustic sets.", listOf(1f, 3f, 2.5f, 1f, 0.5f, -0.5f, -1.5f)),
         EqPreset("low_volume", "Low Volume", "Restores the bass and treble ears lose at quiet levels.", listOf(4.5f, 2.5f, 0.5f, -1f, 0.5f, 2f, 3.5f)),
         EqPreset("soft_treble", "Soft Treble", "Eases harsh, hissy or sibilant recordings.", listOf(1f, 1f, 0.5f, 0f, -1.5f, -3.5f, -5f)),
+        EqPreset("car", "Car & Bluetooth", "Lifts bass, presence and air that road noise and Bluetooth coding take away.", listOf(3f, 1.5f, -0.5f, 0.5f, 2.5f, 3f, 3f)),
         EqPreset("small_speaker", "Small Speaker", "Drops sub-bass tiny speakers can't play, lifts the mids that carry.", listOf(-5f, -2.5f, 1f, 3f, 3.5f, 2.5f, 1f)),
     )
 

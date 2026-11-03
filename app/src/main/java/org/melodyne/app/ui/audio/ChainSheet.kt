@@ -50,6 +50,7 @@ fun ChainSheet(onClose: () -> Unit) {
     val ps by ServiceLocator.player.state.collectAsState()
     val pb by ServiceLocator.playback.state.collectAsState()
     val eq by ServiceLocator.eq.state.collectAsState()
+    val plr by ServiceLocator.normalizer.plr.collectAsState()
     var chain by remember { mutableStateOf<Chain?>(null) }
     var bit by remember { mutableStateOf<Triple<Int, Int, List<Int>>?>(null) }
     BackHandler(onBack = onClose)
@@ -88,6 +89,13 @@ fun ChainSheet(onClose: () -> Unit) {
                     org.melodyne.app.ui.Sparkline(recent, org.melodyne.app.ui.LocalAccent.current, Modifier.fillMaxWidth().height(40.dp))
                     Txt("Counted from the compressed audio frames as they play. The average is file size divided by duration.", size = 11.sp, color = Amoled.Muted, maxLines = 3)
                 }
+            }
+            plr?.let { v ->
+                Txt(
+                    "Dynamics: PLR ${"%.1f".format(v)} dB, " + (if (v < 8f) "a heavily compressed master" else if (v < 12f) "a typical master" else "wide dynamics") +
+                        ". If a song sounds flat, a low number here is the master, not the app.",
+                    size = 12.sp, color = Amoled.Muted, maxLines = 4,
+                )
             }
             Txt("Why no bit-perfect? The source itself is lossy AAC, so the best we can do is avoid ADDING more loss.", size = 12.sp, color = Amoled.Muted, maxLines = 3)
             Txt("Why does the OS path matter for AAC? It stops Android quietly resampling 44.1 kHz to 48 kHz on the way out.", size = 12.sp, color = Amoled.Muted, maxLines = 3)

@@ -6,6 +6,7 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import org.melodyne.app.audio.Loudness
 import org.melodyne.app.audio.NormalizerController
+import org.melodyne.app.audio.Tpdf
 import java.nio.ByteBuffer
 import kotlin.math.abs
 import kotlin.math.pow
@@ -24,6 +25,7 @@ class LoudnessProcessor(private val ctl: NormalizerController) : BaseAudioProces
     private var s2 = DoubleArray(5)
     private var z = Array(2) { DoubleArray(4) }          // per channel: z1,z2 of stage 1, z1,z2 of stage 2
 
+    private val dither = Tpdf()
     private var key: String? = null
     private var measuring = false
     private var blockFrames = 4410
@@ -71,7 +73,7 @@ class LoudnessProcessor(private val ctl: NormalizerController) : BaseAudioProces
         val k = ctl.currentKey
         if (k == key) return
         key = k
-        val remembered = k?.let { ctl.cached(it) }
+        val remembered = k?.let { ctl.cached(it) }?.coerceAtMost(ctl.maxBoostDb.toFloat())
         if (remembered != null) {
             measuring = false
             fadeTo(10.0.pow(remembered / 20.0), rate / 2)
@@ -87,7 +89,8 @@ class LoudnessProcessor(private val ctl: NormalizerController) : BaseAudioProces
         measuring = false
         if (gatedBlocks < 10) { ctl.publish(0f); return }                  // too quiet to judge: leave it alone
         val integrated = Loudness.lufs(gatedEnergy / gatedBlocks)
-        val db = Loudness.gainDb(integrated, peak).toFloat()
+        val db = Loudness.gainDb(integrated, peak, ctl.maxBoostDb).toFloat()
+        ctl.publishPlr(Loudness.plr(integrated, peak).toFloat())
         key?.let { ctl.remember(it, db) }
         fadeTo(10.0.pow(db / 20.0), rate * 2)
         ctl.publish(db)
@@ -123,7 +126,8 @@ class LoudnessProcessor(private val ctl: NormalizerController) : BaseAudioProces
                     z[ch][3] = s2[2] * y1 - s2[4] * y2
                     blockSum += y2 * y2
                 }
-                out.putShort((raw * cur * 32768.0).roundToInt().coerceIn(-32768, 32767).toShort())
+                val v = raw * cur * 32768.0 + (if (cur != 1.0) dither.next() else 0.0)     // untouched samples stay bit-exact
+                out.putShort(v.roundToInt().coerceIn(-32768, 32767).toShort())
             }
             if (measuring && ++blockCount >= blockFrames) {
                 val ms = blockSum / blockFrames

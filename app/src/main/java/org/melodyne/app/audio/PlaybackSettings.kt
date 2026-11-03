@@ -14,6 +14,13 @@ data class PlaybackState(
     val equalPower: Boolean = true,
     val infinite: Boolean = true,
     val glow: Boolean = true,
+    /** Extra stereo width, 0..0.5 (0 = untouched). */
+    val width: Float = 0f,
+    /** -1 (left) .. 1 (right). */
+    val balance: Float = 0f,
+    val skin: String = "liquid",
+    /** Normalisation only turns loud songs down, never boosts quiet ones. */
+    val normGentle: Boolean = true,
 ) {
     /** Normalisation and crossfade are always off in Audiophile Mode, whatever the saved preference says. */
     val normalizeEffective: Boolean get() = normalize && !audiophile
@@ -31,6 +38,10 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
             equalPower = prefs.getBoolean("equal_power", true),
             infinite = prefs.getBoolean("infinite", true),
             glow = prefs.getBoolean("glow", true),
+            width = prefs.getFloat("width", 0f).coerceIn(0f, 0.5f),
+            balance = prefs.getFloat("balance", 0f).coerceIn(-1f, 1f),
+            skin = prefs.getString("skin", "liquid") ?: "liquid",
+            normGentle = prefs.getBoolean("norm_gentle", true),
         )
     )
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -41,7 +52,8 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
         prefs.edit()
             .putBoolean("audiophile", n.audiophile).putBoolean("normalize", n.normalize).putBoolean("crossfade", n.crossfade)
             .putInt("crossfade_sec", n.crossfadeSec).putBoolean("equal_power", n.equalPower)
-            .putBoolean("infinite", n.infinite).putBoolean("glow", n.glow).apply()
+            .putBoolean("infinite", n.infinite).putBoolean("glow", n.glow)
+            .putFloat("width", n.width).putFloat("balance", n.balance).putString("skin", n.skin).putBoolean("norm_gentle", n.normGentle).apply()
     }
 
     fun setAudiophile(on: Boolean) = change { it.copy(audiophile = on) }
@@ -51,6 +63,14 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
     fun setEqualPower(on: Boolean) = change { it.copy(equalPower = on) }
     fun setInfinite(on: Boolean) = change { it.copy(infinite = on) }
     fun setGlow(on: Boolean) = change { it.copy(glow = on) }
+    fun setWidth(w: Float) = change { it.copy(width = w.coerceIn(0f, 0.5f)) }
+    fun setBalance(b: Float) = change { it.copy(balance = b.coerceIn(-1f, 1f)) }
+    fun setSkin(id: String) = change { it.copy(skin = id) }
+    fun setNormGentle(on: Boolean) = change { it.copy(normGentle = on) }
+
+    /** The welcome tour shows once per install (and once after the update that adds it), then only when asked for. */
+    fun wizardSeen(): Boolean = prefs.getBoolean("wizard_seen_v1", false)
+    fun markWizardSeen() { prefs.edit().putBoolean("wizard_seen_v1", true).apply() }
 
     /** One-tap profiles: Normal, Audiophile, Party. */
     fun preset(name: String) = change {
@@ -66,6 +86,7 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
 class NormalizerController(private val prefs: SharedPreferences) {
     @Volatile var enabled: Boolean = false
     @Volatile var currentKey: String? = null
+    @Volatile var maxBoostDb: Double = Loudness.MAX_GAIN_DB
 
     private val _gainDb = MutableStateFlow<Float?>(null)
     /** Gain being applied right now, or null while a song is still being measured. */
@@ -74,6 +95,11 @@ class NormalizerController(private val prefs: SharedPreferences) {
     fun cached(key: String): Float? = if (prefs.contains("gain_$key")) prefs.getFloat("gain_$key", 0f) else null
     fun remember(key: String, db: Float) { prefs.edit().putFloat("gain_$key", db).apply() }
     fun publish(db: Float?) { _gainDb.value = db }
+
+    private val _plr = MutableStateFlow<Float?>(null)
+    /** Peak-to-loudness ratio of the song being played, once measured. */
+    val plr: StateFlow<Float?> = _plr.asStateFlow()
+    fun publishPlr(v: Float?) { _plr.value = v }
 }
 
 /** Fade shapes for crossfade. Equal-power keeps loudness steady through the middle of the fade. */

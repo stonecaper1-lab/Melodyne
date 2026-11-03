@@ -30,11 +30,14 @@ object Loudness {
         return doubleArrayOf(1.0, -2.0, 1.0, 2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0)
     }
 
+    /** Peak-to-loudness ratio in dB: how far the loudest peak sits above the average loudness. Low (under ~8) = a heavily compressed master. */
+    fun plr(integratedLufs: Double, peak: Double): Double = 20.0 * log10(peak.coerceAtLeast(1e-6)) - integratedLufs
+
     fun lufs(meanSquareSum: Double): Double = -0.691 + 10.0 * log10(meanSquareSum)
 
     /** Gain (dB) that brings [integratedLufs] to the target, never boosting past what the measured [peak] (0..1) allows. */
-    fun gainDb(integratedLufs: Double, peak: Double): Double {
-        var db = (TARGET_LUFS - integratedLufs).coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
+    fun gainDb(integratedLufs: Double, peak: Double, maxBoost: Double = MAX_GAIN_DB): Double {
+        var db = (TARGET_LUFS - integratedLufs).coerceIn(MIN_GAIN_DB, maxOf(MIN_GAIN_DB, maxBoost))
         val peakDb = 20.0 * log10(peak.coerceAtLeast(1e-6))
         val headroom = (-peakDb - 0.5).coerceAtLeast(0.0)
         if (db > headroom) db = headroom

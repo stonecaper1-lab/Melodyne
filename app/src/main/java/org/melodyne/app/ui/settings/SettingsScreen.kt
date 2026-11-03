@@ -4,6 +4,8 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,10 +40,13 @@ import org.melodyne.app.ui.Chip
 import org.melodyne.app.ui.Field
 import org.melodyne.app.ui.LocalAccent
 import org.melodyne.app.ui.LocalOpenEaster
+import org.melodyne.app.ui.LocalOpenTour
+import org.melodyne.app.ui.skins.Skins
 import org.melodyne.app.ui.Panel
 import org.melodyne.app.ui.Pill
 import org.melodyne.app.ui.Txt
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen() {
     val vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)
@@ -55,6 +60,7 @@ fun SettingsScreen() {
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
     val openEaster = LocalOpenEaster.current
+    val openTour = LocalOpenTour.current
 
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
@@ -97,6 +103,10 @@ fun SettingsScreen() {
                     "(about the first 8 seconds, to −14 LUFS), then remembered for that song. Applied to the decoded audio only; nothing is re-encoded.",
                 size = 12.sp, color = Amoled.Muted, maxLines = 6,
             )
+            ToggleRow(
+                "Gentle normalisation", "Only turns loud songs down, never boosts quiet ones, so dynamics stay intact.",
+                if (pb.normGentle) "On" else "Off", pb.normGentle,
+            ) { playback.setNormGentle(!pb.normGentle) }
             ToggleRow(
                 "Gapless",
                 if (pb.crossfadeEffective) "Paused while Crossfade is on." else "Songs that declare their encoder delay and padding join without a gap, automatically.",
@@ -142,6 +152,31 @@ fun SettingsScreen() {
                 "Liquid glow", "Soft colour drifting behind the glass, and the blurred artwork on Now Playing. Off gives pure AMOLED black.",
                 if (pb.glow) "On" else "Off", pb.glow,
             ) { playback.setGlow(!pb.glow) }
+            Txt("Player skin", size = 15.sp, weight = FontWeight.SemiBold)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Skins.ALL.forEach { sk -> Chip(sk.name, pb.skin == sk.id) { playback.setSkin(sk.id) } }
+            }
+            Txt(Skins.byId(pb.skin).blurb, size = 12.sp, color = Amoled.Muted, maxLines = 4)
+            Pill("Replay the welcome tour", filled = false) { openTour() }
+        }
+
+        Panel("Car & Bluetooth") {
+            Txt(
+                "If music sounds flatter in the car than a file played directly, the usual causes are the Bluetooth codec, the source quality, " +
+                    "and the car's own volume stage. These help with the parts the app controls.",
+                size = 13.sp, color = Amoled.Muted, maxLines = 6,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Txt("Width +${(pb.width * 100).roundToInt()}%", Modifier.width(92.dp), size = 13.sp, weight = FontWeight.SemiBold)
+                AccentSlider(pb.width / 0.5f, { v -> playback.setWidth(v * 0.5f) }, Modifier.weight(1f))
+            }
+            Txt("Stereo width widens the image without changing the tone. It is bypassed in Audiophile Mode.", size = 12.sp, color = Amoled.Muted, maxLines = 3)
+            Pill("Apply car profile") { playback.setWidth(0.25f); ServiceLocator.eq.setPreset("car"); playback.setNormGentle(true) }
+            Txt(
+                "Bluetooth: pick the best codec your car supports (AAC, aptX or LDAC) in Developer options. Keep Bluetooth absolute volume on and set " +
+                    "the phone's volume high, so the car's dial does the attenuating.",
+                size = 12.sp, color = Amoled.Muted, maxLines = 6,
+            )
         }
 
         Panel("Last.fm") {

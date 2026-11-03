@@ -50,12 +50,14 @@ class EnrichmentService(
 
     private fun parse(text: String): JsonObject? = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
 
-    private suspend fun call(method: String, vararg extra: Pair<String, String>): JsonObject? {
+    private suspend fun call(method: String, vararg extra: Pair<String, String>): JsonObject? = callTtl(ttlMs, method, *extra)
+
+    private suspend fun callTtl(ttl: Long, method: String, vararg extra: Pair<String, String>): JsonObject? {
         val key = keyProvider()
         if (key.isBlank()) return null
         val params = mapOf("method" to method, "api_key" to key, "format" to "json", "autocorrect" to "1") + extra
         val file = cacheFile(params)
-        val fresh = file.exists() && System.currentTimeMillis() - file.lastModified() < ttlMs
+        val fresh = file.exists() && System.currentTimeMillis() - file.lastModified() < ttl
         if (fresh) parse(file.readText())?.let { return it }
         val net = try {
             withContext(Dispatchers.IO) { api.get(params).string() }
@@ -101,8 +103,8 @@ class EnrichmentService(
         return tags to bio
     }
 
-    suspend fun tagTopTracks(tag: String, limit: Int = 30): List<Suggestion> =
-        call("tag.getTopTracks", "tag" to tag, "limit" to limit.toString())
+    suspend fun tagTopTracks(tag: String, limit: Int = 30, ttl: Long = ttlMs): List<Suggestion> =
+        callTtl(ttl, "tag.getTopTracks", "tag" to tag, "limit" to limit.toString())
             ?.obj("tracks")?.get("track").items().mapNotNull(::asSuggestion)
 
     /** Last.fm's most-used tags, as (name, taggings). The source of the genre cloud. */
@@ -119,9 +121,12 @@ class EnrichmentService(
         call("track.getSimilar", "track" to title, "artist" to artist, "limit" to limit.toString())
             ?.obj("similartracks")?.get("track").items().mapNotNull(::asSuggestion)
 
-    suspend fun geoTopTracks(country: String, limit: Int = 25): List<Suggestion> =
-        call("geo.getTopTracks", "country" to country, "limit" to limit.toString())
+    suspend fun geoTopTracks(country: String, limit: Int = 25, ttl: Long = ttlMs): List<Suggestion> =
+        callTtl(ttl, "geo.getTopTracks", "country" to country, "limit" to limit.toString())
             ?.obj("tracks")?.get("track").items().mapNotNull(::asSuggestion)
+
+    suspend fun globalTopTracks(limit: Int = 40, ttl: Long = ttlMs): List<Suggestion> =
+        callTtl(ttl, "chart.getTopTracks", "limit" to limit.toString())?.obj("tracks")?.get("track").items().mapNotNull(::asSuggestion)
 
     private fun asSuggestion(t: JsonObject): Suggestion? {
         val name = t.str("name") ?: return null

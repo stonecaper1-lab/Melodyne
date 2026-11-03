@@ -67,6 +67,8 @@ import org.melodyne.app.ui.nowplaying.NowPlayingScreen
 import org.melodyne.app.ui.search.SearchScreen
 import org.melodyne.app.ui.settings.SettingsScreen
 import org.melodyne.app.ui.album.AlbumScreen
+import org.melodyne.app.ui.artist.ArtistScreen
+import org.melodyne.app.ui.wizard.WizardScreen
 import org.melodyne.app.ui.album.ComposerScreen
 import org.melodyne.app.ui.genre.GenreScreen
 import org.melodyne.app.ui.library.AddToPlaylistDialog
@@ -81,6 +83,8 @@ fun App(conn: PlayerConnection, openSignal: Int = 0) {
     var chainOpen by remember { mutableStateOf(false) }
     var easter by remember { mutableStateOf(false) }
     var genre by remember { mutableStateOf<String?>(null) }
+    var artistName by remember { mutableStateOf<String?>(null) }
+    var tour by remember { mutableStateOf(!ServiceLocator.playback.wizardSeen()) }
     var albumSong by remember { mutableStateOf<Song?>(null) }
     var composerName by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { ServiceLocator.updates.check(false) }
@@ -93,6 +97,7 @@ fun App(conn: PlayerConnection, openSignal: Int = 0) {
 
     CompositionLocalProvider(LocalAccent provides accent, LocalAddToPlaylist provides { song: Song -> pickerSong = song },
         LocalOpenChain provides { chainOpen = true }, LocalOpenEaster provides { easter = true }, LocalOpenGenre provides { t: String -> genre = t },
+        LocalOpenArtist provides { n: String -> artistName = n }, LocalOpenTour provides { tour = true },
         LocalOpenAlbum provides { s: Song -> albumSong = s }, LocalOpenComposer provides { n: String -> composerName = n }) {
         Box(Modifier.fillMaxSize().background(Amoled.Black)) {
             if (pb.glow) AmbientGlow(accent)
@@ -116,12 +121,14 @@ fun App(conn: PlayerConnection, openSignal: Int = 0) {
             ) {
                 NowPlayingScreen(conn, ps, onClose = { expanded = false })
             }
+            artistName?.let { n -> ArtistScreen(n, conn) { artistName = null } }
             albumSong?.let { a -> AlbumScreen(a, conn) { albumSong = null } }
             composerName?.let { c -> ComposerScreen(c, conn) { composerName = null } }
             genre?.let { g -> GenreScreen(g, conn) { genre = null } }
             pickerSong?.let { song -> AddToPlaylistDialog(song) { pickerSong = null } }
             if (chainOpen) ChainSheet { chainOpen = false }
             if (easter) EasterScreen { easter = false }
+            if (tour) WizardScreen(onFinish = { ServiceLocator.playback.markWizardSeen(); tour = false }, onOpenSettings = { tab = 4 })
         }
     }
     BackHandler(enabled = expanded) { expanded = false }

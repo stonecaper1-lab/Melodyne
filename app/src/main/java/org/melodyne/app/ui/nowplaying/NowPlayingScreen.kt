@@ -45,6 +45,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.LongState
@@ -93,6 +94,7 @@ import org.melodyne.app.ui.IconBtn
 import org.melodyne.app.ui.LocalAccent
 import org.melodyne.app.ui.LocalAddToPlaylist
 import org.melodyne.app.ui.LocalOpenAlbum
+import org.melodyne.app.ui.LocalOpenArtist
 import org.melodyne.app.ui.LocalOpenChain
 import org.melodyne.app.ui.LocalOpenComposer
 import org.melodyne.app.ui.LocalOpenGenre
@@ -102,12 +104,25 @@ import org.melodyne.app.ui.Txt
 import org.melodyne.app.ui.fmtMs
 import org.melodyne.app.ui.glass
 import org.melodyne.app.ui.glassSheet
+import org.melodyne.app.ui.skins.SkinActions
+import org.melodyne.app.ui.skins.SkinBody
+import org.melodyne.app.ui.skins.SkinState
+import org.melodyne.app.ui.skins.Skins
 import org.melodyne.app.ui.sound.EqPanel
 import kotlin.math.abs
 
-@OptIn(ExperimentalLayoutApi::class)
+/** The Now Playing screen in whichever skin is chosen; a skin also recolours every control with its own accent. */
 @Composable
 fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> Unit) {
+    val skin by ServiceLocator.playback.state.collectAsState()
+    val base = LocalAccent.current
+    val accent = if (skin.skin == Skins.LIQUID) base else Skins.accent(skin.skin)
+    CompositionLocalProvider(LocalAccent provides accent) { NowPlayingContent(conn, ps, onClose) }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> Unit) {
     val vm: NowPlayingViewModel = viewModel(factory = NowPlayingViewModel.Factory)
     val lyrics by vm.lyrics.collectAsState()
     val info by vm.info.collectAsState()
@@ -119,12 +134,14 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
     val openChain = LocalOpenChain.current
     val openGenre = LocalOpenGenre.current
     val openAlbum = LocalOpenAlbum.current
+    val openArtist = LocalOpenArtist.current
     val openComposer = LocalOpenComposer.current
     LaunchedEffect(ps.songId) { vm.load(ps.currentSong) }
 
     var showLyrics by remember { mutableStateOf(false) }
     var showEq by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showQueue by remember { mutableStateOf(false) }
     // The clock and the live bitrate live in State holders that only small children read, so the artwork and the rest
     // of the screen never recompose with them (that was the flicker).
     val pos = remember { mutableLongStateOf(0L) }
@@ -145,7 +162,7 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             delay(if (ps.isPlaying) 250 else 1000)
         }
     }
-    BackHandler(enabled = showEq || showLyrics || showMenu) { showEq = false; showLyrics = false; showMenu = false }
+    BackHandler(enabled = showEq || showLyrics || showMenu || showQueue) { showEq = false; showLyrics = false; showMenu = false; showQueue = false }
 
     // Album art "expands" on open, then breathes with play/pause.
     var entered by remember { mutableStateOf(false) }
@@ -159,7 +176,8 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
 
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
         // Liquid backdrop: the artwork, blurred and sunk into the dark. "Liquid glow" off keeps it pure AMOLED black.
-        if (pb.glow && ps.artUrl != null) {
+        if (pb.skin != Skins.LIQUID) Box(Modifier.fillMaxSize().background(Skins.background(pb.skin)))
+        if (pb.skin == Skins.LIQUID && pb.glow && ps.artUrl != null) {
             AsyncImage(
                 model = ps.artUrl, contentDescription = null, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(64.dp) else Modifier).graphicsLayer { alpha = 0.5f },
@@ -179,6 +197,7 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
                 Txt("•••", Modifier.clickable { showMenu = true }.padding(horizontal = 10.dp, vertical = 8.dp), size = 14.sp, weight = FontWeight.Black, color = accent)
             }
 
+            if (pb.skin == Skins.LIQUID) {
             // Artwork with its details right underneath: swipe the art left/right for next/previous, up for lyrics.
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(
@@ -206,7 +225,7 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Txt(ps.title, size = 26.sp, weight = FontWeight.ExtraBold)
-                    Txt(ps.artist, size = 16.sp, color = Amoled.Muted)
+                    ArtistLine(ps.artist, openArtist)
                 }
                 Chip("Lyrics", showLyrics) { showLyrics = true }
             }
@@ -244,9 +263,21 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
                 ) { Glyph(if (ps.isPlaying) G.Pause else G.Play, Color.Black, 34.dp) }
                 IconBtn(G.Next, Amoled.OnBg, glyphSize = 32.dp, onClick = conn::next)
             }
+            } else {
+                SkinBody(
+                    pb.skin,
+                    SkinState(ps, pos, dur, live, avg, pb.audiophile, eqState.shaping && !pb.audiophile, pb.infinite, pb.balance),
+                    SkinActions(
+                        onToggle = conn::toggle, onNext = conn::next, onPrev = conn::prev,
+                        onSeekTo = { ms -> conn.seekTo(ms); pos.longValue = ms },
+                        onEq = { showEq = true }, onLyrics = { showLyrics = true }, onQueue = { showQueue = true },
+                    ),
+                    Modifier.weight(1f).padding(vertical = 8.dp),
+                )
+            }
         }
 
-        if (showEq || showLyrics || showMenu) Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showEq = false; showLyrics = false; showMenu = false })
+        if (showEq || showLyrics || showMenu || showQueue) Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showEq = false; showLyrics = false; showMenu = false; showQueue = false })
 
         // Equalizer sheet
         AnimatedVisibility(
@@ -283,7 +314,36 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             }
         }
 
-        // Song menu: album, composer, playlist, signal chain
+        // Queue: tap a song to jump to it
+        AnimatedVisibility(
+            visible = showQueue,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(tween(300)) { it } + fadeIn(tween(200)),
+            exit = slideOutVertically(tween(240)) { it } + fadeOut(tween(160)),
+        ) {
+            val (queue, index) = remember(showQueue, ps.songId) { conn.queue() }
+            Column(
+                Modifier.fillMaxWidth().fillMaxHeight(0.6f).glassSheet().clickable(enabled = false) {}.navigationBarsPadding().padding(horizontal = 22.dp, vertical = 18.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Txt("Queue · ${queue.size}", Modifier.weight(1f), size = 20.sp, weight = FontWeight.ExtraBold)
+                    Chip("Close", false) { showQueue = false }
+                }
+                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                    itemsIndexed(queue) { i, s ->
+                        Row(Modifier.fillMaxWidth().clickable { conn.jumpTo(i); showQueue = false }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Txt(if (i == index) "▶" else "${i + 1}", Modifier.width(30.dp), size = 12.sp, color = if (i == index) accent else Amoled.Muted)
+                            Column(Modifier.weight(1f)) {
+                                Txt(s.title, size = 15.sp, weight = if (i == index) FontWeight.Bold else FontWeight.Normal, color = if (i == index) accent else Amoled.OnBg)
+                                Txt(s.artist, size = 12.sp, color = Amoled.Muted)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Song menu: artist, album, composer, playlist, queue, signal chain
         AnimatedVisibility(
             visible = showMenu,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -298,15 +358,29 @@ fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> U
             ) {
                 Txt(ps.title, size = 18.sp, weight = FontWeight.ExtraBold)
                 Txt(ps.artist, Modifier.padding(bottom = 8.dp), size = 13.sp, color = Amoled.Muted)
+                song?.artist.orEmpty().split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { a -> MenuRow("Go to artist", a) { showMenu = false; openArtist(a) } }
                 if (song != null && song.album.isNotBlank()) MenuRow("Go to album", song.album) { showMenu = false; openAlbum(song) }
                 composers.forEach { c -> MenuRow("Go to composer", c) { showMenu = false; openComposer(c) } }
                 if (song != null) MenuRow("Add to playlist", null) { showMenu = false; addToPlaylist(song) }
+                MenuRow("Queue", null) { showMenu = false; showQueue = true }
                 MenuRow("Signal chain", if (pb.audiophile) "Audiophile Mode is on" else null) { showMenu = false; openChain() }
                 if (song != null && song.album.isBlank() && composers.isEmpty()) {
                     Txt("The source doesn't list an album or composer for this song.", size = 12.sp, color = Amoled.Muted, maxLines = 2)
                 }
                 Pill("Close", Modifier.padding(top = 8.dp), filled = false, onClick = { showMenu = false })
             }
+        }
+    }
+}
+
+/** Each credited artist is its own tap target. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ArtistLine(artist: String, onOpen: (String) -> Unit) {
+    val names = artist.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    FlowRow {
+        names.forEachIndexed { i, n ->
+            Txt(if (i < names.lastIndex) "$n," else n, Modifier.clickable { onOpen(n) }.padding(end = 6.dp, top = 2.dp, bottom = 2.dp), size = 16.sp, color = Amoled.Muted)
         }
     }
 }

@@ -46,19 +46,20 @@ class PlaybackService : MediaSessionService() {
     private lateinit var dataSources: CacheDataSource.Factory
     private val musicAttrs = AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).setUsage(C.USAGE_MEDIA).build()
 
-    private fun renderers(eq: EqProcessor, loudness: LoudnessProcessor?): DefaultRenderersFactory =
+    private fun renderers(eq: EqProcessor, loudness: LoudnessProcessor?, meter: MeterProcessor? = null): DefaultRenderersFactory =
         object : DefaultRenderersFactory(this@PlaybackService) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
                 DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(if (loudness != null) arrayOf<AudioProcessor>(loudness, eq) else arrayOf<AudioProcessor>(eq))
+                    .setAudioProcessors(listOfNotNull<AudioProcessor>(loudness, eq, meter).toTypedArray())
                     .build()
         }
 
     private fun applyEq(p: EqProcessor) {
         val e = ServiceLocator.eq.state.value
-        p.update(e.gains, e.enabled && !ServiceLocator.playback.state.value.audiophile)
+        val pb = ServiceLocator.playback.state.value
+        p.update(e.gains, e.enabled && !pb.audiophile, if (pb.audiophile) 1f else 1f + pb.width, if (pb.audiophile) 0f else pb.balance)
     }
 
     private fun newTailPlayer(): ExoPlayer {
@@ -83,7 +84,7 @@ class PlaybackService : MediaSessionService() {
 
         val eqMain = EqProcessor().also { eqProcessors += it }
         val extractors = MeteringExtractorsFactory(DefaultExtractorsFactory(), ServiceLocator.bitrate)
-        val player = ExoPlayer.Builder(this, renderers(eqMain, loudnessProcessor))
+        val player = ExoPlayer.Builder(this, renderers(eqMain, loudnessProcessor, MeterProcessor()))
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources, extractors))
             .setAudioAttributes(musicAttrs, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
@@ -107,8 +108,11 @@ class PlaybackService : MediaSessionService() {
         // Audiophile Mode bypasses every processor; otherwise the EQ and normalisation follow the user's settings.
         scope.launch {
             combine(ServiceLocator.eq.state, ServiceLocator.playback.state) { e, p -> e to p }.collect { (e, p) ->
-                eqProcessors.forEach { it.update(e.gains, e.enabled && !p.audiophile) }
+                val w = if (p.audiophile) 1f else 1f + p.width
+                val bal = if (p.audiophile) 0f else p.balance
+                eqProcessors.forEach { it.update(e.gains, e.enabled && !p.audiophile, w, bal) }
                 ServiceLocator.normalizer.enabled = p.normalizeEffective
+                ServiceLocator.normalizer.maxBoostDb = if (p.normGentle) 0.0 else org.melodyne.app.audio.Loudness.MAX_GAIN_DB
                 OutputInspector.applyBitPerfect(this@PlaybackService, p.audiophile)
             }
         }

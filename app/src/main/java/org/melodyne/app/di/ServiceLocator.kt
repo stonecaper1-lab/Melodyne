@@ -28,6 +28,8 @@ import org.melodyne.app.data.remote.HostedApi
 import org.melodyne.app.data.repo.ChainRepository
 import org.melodyne.app.data.repo.HostStore
 import org.melodyne.app.data.repo.AlbumService
+import org.melodyne.app.data.repo.ArtistService
+import org.melodyne.app.data.repo.ChartService
 import org.melodyne.app.data.repo.GenreService
 import org.melodyne.app.data.repo.HostedRepository
 import org.melodyne.app.data.repo.InfiniteService
@@ -88,6 +90,8 @@ object ServiceLocator {
     val enrichment by lazy { EnrichmentService(lastFmRetrofit.create(LastFmReadApi::class.java), { lastFm.currentKey() }, app.cacheDir, json) }
     val resolver by lazy { TrackResolver(repo) }
     val moods by lazy { MoodService(enrichment, resolver, repo) }
+    val charts by lazy { ChartService(enrichment, resolver, repo, prefs) }
+    val artists by lazy { ArtistService(repo, enrichment) }
     val albums by lazy { AlbumService(repo) }
     val people by lazy { PersonService(repo, enrichment) }
     val genres by lazy { GenreService(enrichment, resolver, repo) }

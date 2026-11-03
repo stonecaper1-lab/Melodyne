@@ -9,6 +9,8 @@ import org.junit.Test
 import org.melodyne.app.ai.AiClient
 import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.audio.EQ_BANDS
+import org.melodyne.app.audio.Tpdf
+import org.melodyne.app.ui.skins.Skins
 import org.melodyne.app.audio.Loudness
 import org.melodyne.app.audio.PlaybackState
 import org.melodyne.app.data.repo.AlbumService
@@ -256,5 +258,25 @@ class CoreTest {
     @Test fun composerCreditsSplitIntoSeparateNames() {
         assertEquals(setOf("pritam", "mithoon"), org.melodyne.app.domain.TitleText.artistKeys("Pritam, Mithoon"))
         assertEquals("", song("1", "A").composer)                       // old saved songs default to "no composer"
+    }
+
+    // ---- fidelity helpers and skins ----
+    @Test fun gentleNormalisationNeverBoostsAndPlrIsPeakOverLoudness() {
+        assertEquals(0.0, Loudness.gainDb(-20.0, 0.1, 0.0), 1e-9)
+        assertEquals(-6.0, Loudness.gainDb(-8.0, 0.5, 0.0), 1e-9)
+        assertEquals(8.7, Loudness.plr(-9.0, 0.966), 0.1)
+    }
+
+    @Test fun ditherIsCentredAndBounded() {
+        val d = Tpdf()
+        var sum = 0.0
+        repeat(100_000) { val v = d.next(); assertTrue(v > -1.0 && v < 1.0); sum += v }
+        assertEquals(0.0, sum / 100_000, 0.02)
+    }
+
+    @Test fun skinsAreUniqueAndUnknownIdsFallBackToLiquid() {
+        assertEquals(Skins.ALL.size, Skins.ALL.map { it.id }.toSet().size)
+        assertEquals("liquid", Skins.byId("nope").id)
+        assertTrue(Skins.ALL.map { it.id }.containsAll(listOf("liquid", "amp", "tape", "deck")))
     }
 }
