@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.1
+- Update notifications: a background check every few hours tells you when a new release exists. Tap the notification and the download starts by itself; when it finishes, tap "Install". Works with Melodyne closed. Turn it off in Settings > Updates.
+- Now Playing home-screen widget: artwork, title, artist, live quality label, and working previous, play/pause and next buttons. Tap the art or title to open the player. Add it from Settings or the Widgets menu.
+
 ## v0.7.0
 - Welcome tour: shown once on every install (including updates), explains Audiophile Mode, the sound tools and what is different here; replay it from Settings > Appearance.
 - Fidelity: dithered 16-bit output, stereo width and a Car & Bluetooth curve and profile, gentle (reduce-only) normalisation, a dynamics readout (PLR) in the signal chain, and Bluetooth/car guidance.

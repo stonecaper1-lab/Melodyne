@@ -212,6 +212,9 @@ class PlayerConnection(private val app: Context) {
 
     fun jumpTo(index: Int) { controller?.let { it.seekToDefaultPosition(index); it.play() } }
 
+    /** Runs a command as soon as the player is connected (used by the home-screen widget). */
+    fun command(block: (MediaController) -> Unit) = withController(block)
+
     fun toggle() { controller?.let { if (it.isPlaying) it.pause() else it.play() } }
     fun next() { controller?.seekToNextMediaItem() }
     fun prev() { controller?.let { if (it.currentPosition > 3_000) it.seekTo(0) else it.seekToPreviousMediaItem() } }

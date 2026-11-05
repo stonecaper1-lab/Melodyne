@@ -157,6 +157,13 @@ fun SettingsScreen() {
                 Skins.ALL.forEach { sk -> Chip(sk.name, pb.skin == sk.id) { playback.setSkin(sk.id) } }
             }
             Txt(Skins.byId(pb.skin).blurb, size = 12.sp, color = Amoled.Muted, maxLines = 4)
+            Pill("Add the Now Playing widget", filled = false) {
+                runCatching {
+                    val mgr = ctx.getSystemService(android.appwidget.AppWidgetManager::class.java)
+                    if (mgr.isRequestPinAppWidgetSupported) mgr.requestPinAppWidget(android.content.ComponentName(ctx, org.melodyne.app.widget.NowPlayingWidget::class.java), null, null)
+                }
+            }
+            Txt("Or long-press your home screen, choose Widgets, then Melodyne.", size = 12.sp, color = Amoled.Muted, maxLines = 2)
             Pill("Replay the welcome tour", filled = false) { openTour() }
         }
 
@@ -242,10 +249,19 @@ fun SettingsScreen() {
 
         Panel("Updates") {
             Txt(s.updateStatus, size = 13.sp, color = if (update != null) Amoled.Ok else Amoled.Muted, maxLines = 3)
+            var notifyOn by remember { mutableStateOf(ServiceLocator.updates.notifyEnabled) }
+            ToggleRow(
+                "Update notifications", "A check every few hours, even when Melodyne is closed. Tap the notification and the download starts by itself.",
+                if (notifyOn) "On" else "Off", notifyOn,
+            ) {
+                notifyOn = !notifyOn
+                ServiceLocator.updates.notifyEnabled = notifyOn
+                runCatching { org.melodyne.app.data.update.UpdateScheduler.ensure(ctx) }
+            }
             Pill("Check now") { vm.checkUpdates() }
             Txt(
                 "Melodyne looks at the project's latest GitHub release when it opens (at most every 6 hours). Nothing installs by itself; " +
-                    "Download opens the release in your browser. A private repository needs a read-only GitHub token.",
+                    "A new version downloads inside Melodyne and Android then asks you to install it (the first time you will be asked to allow installs from Melodyne). A private repository needs a read-only GitHub token and opens the release page instead.",
                 size = 12.sp, color = Amoled.Muted, maxLines = 6,
             )
             Field(updRepo, { updRepo = it }, "owner/repository")

@@ -47,6 +47,26 @@ class UpdateChecker(
         }
     }
 
+    var notifyEnabled: Boolean
+        get() = prefs.getBoolean("upd_notify", true)
+        set(v) { prefs.edit().putBoolean("upd_notify", v).apply() }
+
+    /** For the background job: the newest release if it is newer than this app and hasn't been waved away with "Later". */
+    suspend fun newerRelease(): UpdateInfo? {
+        val info = try {
+            fetch()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return null
+        }
+        prefs.edit().putLong("upd_last", System.currentTimeMillis()).putString("upd_info", json.encodeToString(UpdateInfo.serializer(), info)).apply()
+        if (!isNewer(info.version, current)) return null
+        if (prefs.getString("upd_dismissed", null) == info.version) return null
+        _available.value = info
+        return info
+    }
+
     fun saveSource(repo: String, token: String) {
         prefs.edit().putString("upd_repo", repo.trim().ifBlank { DEFAULT_REPO }).putString("upd_token", token.trim()).putLong("upd_last", 0).apply()
     }

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Melodyne</string>
+    <string name="widget_description">What is playing, with previous, play and next</string>
 </resources>

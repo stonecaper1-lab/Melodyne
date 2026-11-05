@@ -22,12 +22,16 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import org.melodyne.app.MainActivity
 import org.melodyne.app.di.ServiceLocator
+import org.melodyne.app.widget.WidgetSnapshot
+import org.melodyne.app.widget.WidgetUpdater
 import java.io.File
 
 /**
@@ -40,6 +44,8 @@ class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private var cache: SimpleCache? = null
     private var engine: CrossfadeEngine? = null
+    private var widgetJob: Job? = null
+    private var lastQuality = ""
     private val eqProcessors = ArrayList<EqProcessor>()
     private val loudnessProcessor = LoudnessProcessor(ServiceLocator.normalizer)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -101,8 +107,18 @@ class PlaybackService : MediaSessionService() {
         )
         val s = MediaSession.Builder(this, player).setSessionActivity(openApp).build()
         session = s
-        QualityMonitor(player) { q -> s.setSessionExtras(q.toBundle()) }.attach()
+        QualityMonitor(player) { q -> s.setSessionExtras(q.toBundle()); lastQuality = q.label(); scheduleWidget(player) }.attach()
         Scrobbling(player, scope, ServiceLocator.lastFm).attach()
+        // Keep the Now Playing home-screen widget in step with the player.
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onEvents(p: androidx.media3.common.Player, events: androidx.media3.common.Player.Events) {
+                if (events.containsAny(
+                        androidx.media3.common.Player.EVENT_MEDIA_ITEM_TRANSITION, androidx.media3.common.Player.EVENT_IS_PLAYING_CHANGED,
+                        androidx.media3.common.Player.EVENT_MEDIA_METADATA_CHANGED, androidx.media3.common.Player.EVENT_PLAYBACK_STATE_CHANGED,
+                    )
+                ) scheduleWidget(p)
+            }
+        })
         engine = CrossfadeEngine(player, { newTailPlayer() }, ServiceLocator.playback, ServiceLocator.normalizer, scope).also { it.attach() }
 
         // Audiophile Mode bypasses every processor; otherwise the EQ and normalisation follow the user's settings.
@@ -123,6 +139,18 @@ class PlaybackService : MediaSessionService() {
             }
         })
         ServiceLocator.normalizer.currentKey = player.currentMediaItem?.mediaId
+    }
+
+    private fun scheduleWidget(p: androidx.media3.common.Player) {
+        widgetJob?.cancel()
+        widgetJob = scope.launch {
+            delay(300)
+            val md = p.mediaMetadata
+            WidgetUpdater.update(
+                this@PlaybackService,
+                WidgetSnapshot(md.title?.toString().orEmpty(), md.artist?.toString().orEmpty(), lastQuality, p.isPlaying, md.artworkUri?.toString()),
+            )
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

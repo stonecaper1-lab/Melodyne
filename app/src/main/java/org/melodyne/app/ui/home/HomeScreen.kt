@@ -1,5 +1,6 @@
 package org.melodyne.app.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import org.melodyne.app.data.repo.ChartService
+import org.melodyne.app.data.update.UpdateInstaller
 import org.melodyne.app.data.repo.MoodService
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.Song
@@ -134,8 +136,9 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Pill("Download") {
-                            val direct = u.apkUrl
-                            uri.openUri(if (ServiceLocator.updates.token.isBlank() && direct != null) direct else u.pageUrl)
+                            if (UpdateInstaller.canAutoDownload(u) && UpdateInstaller.download(ctx, u)) {
+                                Toast.makeText(ctx, "Downloading v${u.version}. I'll notify you when it's ready to install.", Toast.LENGTH_LONG).show()
+                            } else uri.openUri(u.pageUrl)
                         }
                         Pill("Later", filled = false) { ServiceLocator.updates.dismiss() }
                     }

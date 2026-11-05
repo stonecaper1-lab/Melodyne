@@ -9,5 +9,6 @@ class MelodyneApp : Application() {
         super.onCreate()
         ServiceLocator.init(this)
         CrashLog.install(ServiceLocator.prefs)
+        runCatching { org.melodyne.app.data.update.UpdateScheduler.ensure(this) }
     }
 }
