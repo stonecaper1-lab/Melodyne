@@ -77,7 +77,7 @@ fun Txt(
     maxLines = maxLines,
 )
 
-enum class G { Play, Pause, Next, Prev, Down }
+enum class G { Play, Pause, Next, Prev, Down, Stop }
 
 /** Transport icons drawn on a Canvas: no icon library, no bitmaps. */
 @Composable
@@ -105,6 +105,7 @@ fun Glyph(kind: G, color: Color, boxSize: Dp = 24.dp, modifier: Modifier = Modif
                 }, color)
                 drawRect(color, Offset(w * .18f, h * .20f), Size(w * .10f, h * .60f))
             }
+            G.Stop -> drawRoundRect(color, Offset(w * .26f, h * .26f), Size(w * .48f, h * .48f), CornerRadius(w * .05f))
             G.Down -> drawPath(
                 Path().apply { moveTo(w * .22f, h * .38f); lineTo(w * .50f, h * .66f); lineTo(w * .78f, h * .38f) },
                 color, style = Stroke(width = w * .09f, cap = StrokeCap.Round, join = StrokeJoin.Round),

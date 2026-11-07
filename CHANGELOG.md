@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.0
+- Widget upgrade: three layouts that switch as you resize it (compact, standard, large), a progress bar and elapsed time that keep moving while you play, an accent colour taken from the artwork, and a Play button that opens the app when nothing is loaded.
+- Classic Amp skin, closer to the 90s originals: titled windows with shade and close, real seven-segment time, a spectrum with falling peak caps, a green-to-red volume bar, an Equalizer window with your seven bands (and the automatic preamp readout), and a playlist window.
+- Cassette skin: a tape that slides in, ruled label, screws, spring-damped VU needles with a dB scale, piano keys that stay pressed.
+- Receiver skin: walnut side panels, brushed silver, a tuner dial whose needle follows the song, LED meters, and bass and treble knobs that really move your EQ.
+- Skin buttons give a small haptic click.
+
 ## v0.7.1
 - Update notifications: a background check every few hours tells you when a new release exists. Tap the notification and the download starts by itself; when it finishes, tap "Install". Works with Melodyne closed. Turn it off in Settings > Updates.
 - Now Playing home-screen widget: artwork, title, artist, live quality label, and working previous, play/pause and next buttons. Tap the art or title to open the player. Add it from Settings or the Widgets menu.

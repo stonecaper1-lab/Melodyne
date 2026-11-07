@@ -10,7 +10,10 @@ import org.melodyne.app.ai.AiClient
 import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.audio.EQ_BANDS
 import org.melodyne.app.audio.Tpdf
+import org.melodyne.app.ui.skins.SevenSegments
 import org.melodyne.app.ui.skins.Skins
+import org.melodyne.app.ui.skins.mmss
+import org.melodyne.app.widget.WidgetMath
 import org.melodyne.app.audio.Loudness
 import org.melodyne.app.audio.PlaybackState
 import org.melodyne.app.data.repo.AlbumService
@@ -278,5 +281,19 @@ class CoreTest {
         assertEquals(Skins.ALL.size, Skins.ALL.map { it.id }.toSet().size)
         assertEquals("liquid", Skins.byId("nope").id)
         assertTrue(Skins.ALL.map { it.id }.containsAll(listOf("liquid", "amp", "tape", "deck")))
+    }
+
+    // ---- skins and widget helpers ----
+    @Test fun sevenSegmentDigitsLightTheRightSegments() {
+        assertEquals("abcdefg", SevenSegments.segmentsFor('8'))
+        assertEquals("bc", SevenSegments.segmentsFor('1'))
+        assertEquals("g", SevenSegments.segmentsFor('-'))
+        assertEquals("", SevenSegments.segmentsFor('x'))
+    }
+
+    @Test fun clocksAndWidgetProgressBehave() {
+        assertEquals("03:07", mmss(187_000)); assertEquals("00:00", mmss(0)); assertEquals("01:05", mmss(-65_000))
+        assertEquals(250, WidgetMath.progress(50, 200)); assertEquals(1000, WidgetMath.progress(500, 200)); assertEquals(0, WidgetMath.progress(5, 0))
+        assertEquals("3:07", WidgetMath.clock(187_000))
     }
 }

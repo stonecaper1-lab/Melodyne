@@ -271,6 +271,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
                         onToggle = conn::toggle, onNext = conn::next, onPrev = conn::prev,
                         onSeekTo = { ms -> conn.seekTo(ms); pos.longValue = ms },
                         onEq = { showEq = true }, onLyrics = { showLyrics = true }, onQueue = { showQueue = true },
+                        onClose = onClose, queue = { conn.queue() }, onJump = { conn.jumpTo(it) },
                     ),
                     Modifier.weight(1f).padding(vertical = 8.dp),
                 )

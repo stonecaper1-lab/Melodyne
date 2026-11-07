@@ -26,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import org.melodyne.app.MainActivity
@@ -45,6 +46,7 @@ class PlaybackService : MediaSessionService() {
     private var cache: SimpleCache? = null
     private var engine: CrossfadeEngine? = null
     private var widgetJob: Job? = null
+    private var widgetTick: Job? = null
     private var lastQuality = ""
     private val eqProcessors = ArrayList<EqProcessor>()
     private val loudnessProcessor = LoudnessProcessor(ServiceLocator.normalizer)
@@ -141,16 +143,23 @@ class PlaybackService : MediaSessionService() {
         ServiceLocator.normalizer.currentKey = player.currentMediaItem?.mediaId
     }
 
+    private suspend fun pushWidget(p: androidx.media3.common.Player) {
+        val md = p.mediaMetadata
+        WidgetUpdater.update(
+            this,
+            WidgetSnapshot(
+                md.title?.toString().orEmpty(), md.artist?.toString().orEmpty(), lastQuality, p.isPlaying, md.artworkUri?.toString(),
+                p.currentPosition, p.duration.takeIf { it > 0 } ?: 0L,
+            ),
+        )
+    }
+
+    /** Updates the widget soon after any change, and every five seconds while playing so its progress bar keeps moving. */
     private fun scheduleWidget(p: androidx.media3.common.Player) {
         widgetJob?.cancel()
-        widgetJob = scope.launch {
-            delay(300)
-            val md = p.mediaMetadata
-            WidgetUpdater.update(
-                this@PlaybackService,
-                WidgetSnapshot(md.title?.toString().orEmpty(), md.artist?.toString().orEmpty(), lastQuality, p.isPlaying, md.artworkUri?.toString()),
-            )
-        }
+        widgetJob = scope.launch { delay(300); pushWidget(p) }
+        widgetTick?.cancel()
+        if (p.isPlaying) widgetTick = scope.launch { while (isActive) { delay(5000); pushWidget(p) } }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

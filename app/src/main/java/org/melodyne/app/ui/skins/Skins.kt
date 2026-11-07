@@ -16,17 +16,17 @@ object Skins {
         SkinSpec(LIQUID, "Liquid", "The default: liquid glass, blurred artwork and your song's own colour.", Color(0xFF1DE9B6)),
         SkinSpec(
             "amp", "Classic Amp",
-            "A 90s desktop player. LCD time (tap to flip between elapsed and remaining), a real 16-band spectrum, live kbps and kHz lamps, scrolling title, working volume and balance, and a playlist button.",
+            "The 90s desktop player, window by window: a titled main window you can shade or close, seven-segment time (tap to flip elapsed and remaining), a real spectrum with falling peak caps, live kbps and kHz, a scrolling title, green-to-red volume and balance bars, an Equalizer window with your seven bands and a playlist window you can tap to jump around.",
             Color(0xFF00FF66),
         ),
         SkinSpec(
             "tape", "Cassette",
-            "Reels that turn as you play, tape that moves from one spool to the other with the song's progress, VU needles driven by the real levels, a tape counter, and hold-to-scrub rewind and fast-forward.",
+            "A C-90 slides in. Reels turn as you play, tape moves from one spool to the other with the song's progress, spring-damped VU needles with a dB scale read the real levels, and the piano keys stay pressed while they are active. Hold rewind or fast-forward to scrub.",
             Color(0xFFFFB347),
         ),
         SkinSpec(
             "deck", "Receiver",
-            "A 1982 hi-fi receiver. Amber display, LED spectrum, a volume knob you can turn, a tuning dial for seeking, and lamps that really light for Pure Direct, Loudness and EQ.",
+            "A 1982 hi-fi receiver in walnut and brushed silver. A tuner dial whose needle tracks the song, an amber display, LED meters, a volume knob, and bass and treble knobs that really move your EQ. Pure Direct and Loudness are real switches.",
             Color(0xFFFFB000),
         ),
     )
