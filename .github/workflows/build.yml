@@ -16,7 +16,7 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -44,12 +44,12 @@ jobs:
           echo "version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)" >> "$GITHUB_OUTPUT"
           awk '/^## /{n++; next} n==1' CHANGELOG.md > RELEASE_NOTES.md 2>/dev/null || echo "See the commit history." > RELEASE_NOTES.md
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.9"
 
@@ -58,17 +58,48 @@ jobs:
         run: gradle --no-daemon :app:testDebugUnitTest
 
       - name: Build release APK
+        id: build
         env:
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
-        run: gradle --no-daemon :app:assembleRelease
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:assembleRelease 2>&1 | tee build.log
+
+      - name: What went wrong
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          {
+            echo "## The build failed"
+            echo
+            echo "### Kotlin compile errors"
+            echo '```'
+            (grep -E '^e: ' build.log | sed -E 's#file:///[^ ]*/work/[^/]*/[^/]*/##' | head -40) || true
+            echo '```'
+            echo "### What Gradle said"
+            echo '```'
+            (grep -A8 'What went wrong' build.log | head -40) || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect APK
         run: |
           cp app/build/outputs/apk/release/app-release.apk melodyne.apk
           cp melodyne.apk "Melodyne-v${{ steps.meta.outputs.version }}.apk"
 
-      - uses: actions/upload-artifact@v4
+      - name: Size report
+        run: |
+          SIZE=$(stat -c%s melodyne.apk)
+          {
+            echo "### APK size: $SIZE bytes (limit 5,000,000)"
+            echo
+            echo "Largest files inside the APK (compressed size in the third column):"
+            echo '```'
+            (unzip -lv melodyne.apk | sort -k3 -n -r | head -15) || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
         with:
           name: melodyne-apk
           path: melodyne.apk
