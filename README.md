@@ -1,87 +1,103 @@
-<div align="center">
-
 # Melodyne
+
+<div align="center">
 
 <img src="https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
 <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
 <img src="https://img.shields.io/badge/Free%20Software-00C7B7?style=for-the-badge" alt="Free software" />
 <img src="https://img.shields.io/badge/No%20Ads-FF6B6B?style=for-the-badge" alt="No ads" />
 
-### Your music, your mood, your way.
+## Listen better. Feel less noise.
 
-A small, free-software music player for Android — built to feel calm, honest, and easy to live with.
+A tiny, free-software music player for Android built for people who want music to feel calm, honest, and alive.
 
-[Download latest APK](https://github.com/stonecaper1-lab/Melodyne/releases/latest) · [See releases](https://github.com/stonecaper1-lab/Melodyne/releases) · [Build from source](#build)
+[Download latest APK](https://github.com/stonecaper1-lab/Melodyne/releases/latest) · [View releases](https://github.com/stonecaper1-lab/Melodyne/releases) · [Build from source](#build)
 
 </div>
 
 ---
 
-Melodyne is for the moments when you want music to feel natural instead of noisy. Find the right vibe, keep the signal honest, and let the album art, sound, and queue work with you instead of against you.
+Melodyne is a music player designed around one simple idea: the app should help you listen, not compete with the music.
 
-No account to create. No ads. No analytics. Your library stays on your device.
+No signup. No ads. No hidden analytics. Just a focused player that gives you the signal, the mood, and the flow you want.
 
-## Why people like it
+## Why Melodyne
 
-- 🎵 **A calmer listening flow** — a focused player that stays out of your way.
-- 🔊 **Sound you can trust** — live bitrate and audio details are measured from playback, not guessed.
-- 🎧 **Less processing, more honesty** — Audiophile Mode keeps the signal path cleaner when you want it.
-- 🧠 **Personalized discovery** — moods, charts, infinite play, and AI Mix keep the app feeling alive.
-- 🫶 **Your setup, your taste** — choose your skins, playlist flow, and how explicit you want the app to be.
+- 🎵 Less clutter, more listening.
+- 🔊 Real playback data, not marketing copy.
+- 🎧 Cleaner signal path when you want it.
+- 🧠 Discovery that feels personal, not noisy.
+- 🧩 Playlists and controls that stay out of your way.
 
-## Highlights
+## The experience
 
-| Feature | What it does |
+### Sound that feels honest
+
+Melodyne shows live bitrate and audio details as the track plays, so you can see what the stream is actually doing in real time instead of trusting a file header or a vague status label.
+
+### Tune without the drama
+
+Use a seven-band EQ, gentle loudness shaping, and a cleaner Audiophile Mode when you want the sound path to stay as direct as possible.
+
+### Make it feel like your own
+
+Choose your preferred skin, build playlists, discover moods, and let the app keep the queue moving when you're in the mood for something new.
+
+### Built for a good listening session
+
+Whether you're commuting, working, winding down, or just trying to get the vibe back, Melodyne is meant to be simple, personal, and intentionally calm.
+
+## Features
+
+| Feature | What it means |
 | --- | --- |
-| 🎚️ Equalizer | Seven-band tuning with gentle loudness and headroom-aware controls. |
-| 🎧 Audiophile Mode | Bypasses Melodyne’s EQ, normalization, and crossfade to keep the signal cleaner. |
-| 📈 Live bitrate | Shows what the stream is actually doing as the song plays. |
-| 🔁 Infinite play | Keeps the queue moving with recommended music that fits your taste. |
-| 🧩 Smart playlists | Build your own collection from listening history and track length. |
-| 🤖 AI Mix | Connect to an OpenAI-compatible endpoint with your own key. |
-| 🧪 Last.fm | Unlock richer discovery and scrobbling with your own API key. |
+| 🎚️ Equalizer | Shape the tone with a seven-band EQ and headroom-aware tuning. |
+| 🎧 Audiophile Mode | Bypass Melodyne’s own processing for a cleaner path to the output. |
+| 📈 Live bitrate | Watch a song’s actual playback stats as it runs. |
+| 🔁 Infinite play | Keep the queue moving with suggestions that match your mood. |
+| 🧩 Smart playlists | Build collections around listening history and track length. |
+| 🤖 AI Mix | Connect to an OpenAI-compatible endpoint using your own key. |
+| 🧪 Last.fm | Add richer discovery and scrobbles with your own API key. |
 
-## Get Melodyne
+## Get it
 
-Download the latest build from the [releases page](https://github.com/stonecaper1-lab/Melodyne/releases/latest).
+Download the latest APK from the [releases page](https://github.com/stonecaper1-lab/Melodyne/releases/latest):
 
 ```text
-releases/latest/download/melodyne.apk
+https://github.com/stonecaper1-lab/Melodyne/releases/latest/download/melodyne.apk
 ```
 
 ## Build
 
-You can build locally with JDK 17, Gradle 8.9, and Android SDK 34:
+Local build:
 
 ```bash
 gradle :app:assembleRelease
 ```
 
-Or push the repo to GitHub and run the `build-apk` workflow to test and build the APK without setting up a local Android SDK.
+Requirements:
+- JDK 17
+- Gradle 8.9
+- Android SDK 34
 
-> `app/melodyne-dev.jks` is a public development key so test builds can install over one another. Replace it with your own signing key before distributing builds.
+Or run the `build-apk` GitHub Action to build and test without a local Android SDK setup.
 
-## Under the hood
+> `app/melodyne-dev.jks` is a public development key so test builds can replace each other during development. Replace it before distributing a public build.
 
-Melodyne is built in **Kotlin** with **Jetpack Compose** and **Media3/ExoPlayer**. It uses Retrofit and OkHttp for networking, and intentionally avoids Firebase, Google Play Services, analytics, and ad SDKs.
+## Tech stack
 
-A few implementation details worth knowing:
-
-- 🔍 The quality badge reflects the format information available from the stream; it is not a spectral analysis.
-- ⚖️ The equalizer keeps automatic headroom so it can shape the sound without clipping or overdoing it.
-- 📡 Audiophile Mode removes Melodyne’s processing layers, but Android’s system mixer and Bluetooth re-encoding still remain outside the app’s control.
-- 💾 Playlists are stored locally and can be exported as JSON when needed.
+Melodyne is built in **Kotlin** using **Jetpack Compose** and **Media3/ExoPlayer**. Networking uses **Retrofit + OkHttp**, and the app intentionally avoids Firebase, Google Play Services, analytics, and ad SDKs.
 
 ## Current limitations
 
-- 📁 Local music files on your phone are not supported yet.
+- 📁 Local music files stored on the phone are not supported yet.
 - 🔐 AI Mix with a custom endpoint requires your own API key.
 - 🌉 Crossfade is not yet implemented.
 
 ## Releases
 
-This project’s release workflow publishes the APK and uses the notes at the top of [`CHANGELOG.md`](CHANGELOG.md). You can browse all builds in the [releases tab](https://github.com/stonecaper1-lab/Melodyne/releases).
+The release workflow publishes the APK and uses the notes at the top of [`CHANGELOG.md`](CHANGELOG.md). You can browse all builds in the [releases tab](https://github.com/stonecaper1-lab/Melodyne/releases).
 
 ---
 
-Made for people who want a music player that feels a little more human and a little less like a billboard.
+Made for listeners who want a music player that feels more human and a lot less like a dashboard.
