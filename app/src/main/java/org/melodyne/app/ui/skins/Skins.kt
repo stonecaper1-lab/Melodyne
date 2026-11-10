@@ -16,17 +16,17 @@ object Skins {
         SkinSpec(LIQUID, "Liquid", "The default: liquid glass, blurred artwork and your song's own colour.", Color(0xFF1DE9B6)),
         SkinSpec(
             "amp", "Classic Amp",
-            "The 90s desktop player, window by window: a titled main window you can shade or close, seven-segment time (tap to flip elapsed and remaining), a real spectrum with falling peak caps, live kbps and kHz, a scrolling title, green-to-red volume and balance bars, an Equalizer window with your seven bands and a playlist window you can tap to jump around.",
+            "The 90s desktop player, window by window: a titled main window you can shade or close, seven-segment time (tap to flip elapsed and remaining), a real spectrum with falling peak caps, and a playlist editor.",
             Color(0xFF00FF66),
         ),
         SkinSpec(
-            "tape", "Cassette",
-            "A C-90 slides in. Reels turn as you play, tape moves from one spool to the other with the song's progress, spring-damped VU needles with a dB scale read the real levels, and the piano keys stay pressed while they are active. Hold rewind or fast-forward to scrub.",
-            Color(0xFFFFB347),
+            "tape", "Cassette ’96",
+            "A cassette deck reimagined with the compact graphite panels, electric-lime analyzer, blue title bar, segmented readout and playlist feel of a classic 90s desktop player. Original Melodyne artwork and real playback controls.",
+            Color(0xFFB7FF35),
         ),
         SkinSpec(
             "deck", "Receiver",
-            "A 1982 hi-fi receiver in walnut and brushed silver. A tuner dial whose needle tracks the song, an amber display, LED meters, a volume knob, and bass and treble knobs that really move your EQ. Pure Direct and Loudness are real switches.",
+            "A 1982 hi-fi receiver in walnut and brushed silver. A tuner dial whose needle tracks the song, an amber display, LED meters, a volume knob, and bass and treble knobs that really move the EQ.",
             Color(0xFFFFB000),
         ),
     )
@@ -36,7 +36,7 @@ object Skins {
 
     fun background(id: String): Brush = when (id) {
         "amp" -> Brush.verticalGradient(listOf(Color(0xFF14171B), Color(0xFF0A0C0E)))
-        "tape" -> Brush.verticalGradient(listOf(Color(0xFF241B16), Color(0xFF120D0A)))
+        "tape" -> Brush.verticalGradient(listOf(Color(0xFF111824), Color(0xFF080B10)))
         "deck" -> Brush.verticalGradient(listOf(Color(0xFF1B1B1D), Color(0xFF0B0B0C)))
         else -> Brush.verticalGradient(listOf(Color.Black, Color.Black))
     }
