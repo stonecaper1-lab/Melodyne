@@ -86,7 +86,7 @@ Or run the `build-apk` GitHub Action to build and test without a local Android S
 
 ## Tech stack
 
-Melodyne is built in **Kotlin** using **Jetpack Compose** and **Media3/ExoPlayer**. Networking uses **Retrofit + OkHttp**, and the app intentionally avoids Firebase, Google Play Services, analytics, and ad SDKs.
+Melodyne is built in Kotlin using Jetpack Compose and Media3/ExoPlayer. Networking uses Retrofit + OkHttp, and the app intentionally avoids Firebase, Google Play Services, analytics, and ad SDKs.
 
 ## Current limitations
 
