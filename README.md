@@ -92,7 +92,7 @@ Melodyne is built in Kotlin using Jetpack Compose and Media3/ExoPlayer. Networki
 
 - 📁 Local music files stored on the phone are not supported yet.
 - 🔐 AI Mix with a custom endpoint requires your own API key.
-- 🌉 Crossfade is not yet implemented.
+- 📁 Local music files stored on the phone are not supported yet.
 
 ## Releases
 
