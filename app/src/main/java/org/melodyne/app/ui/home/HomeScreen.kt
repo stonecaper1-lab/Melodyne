@@ -110,7 +110,7 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
             Column(pad.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     MelodyneMark(ps.isPlaying, accent)
-                    Txt("melodyne", Modifier.padding(start = 8.dp).weight(1f), size = 17.sp, weight = FontWeight.Bold, color = Amoled.Muted)
+                    Txt("vina", Modifier.padding(start = 8.dp).weight(1f), size = 17.sp, weight = FontWeight.Bold, color = Amoled.Muted)
                     Chip("AUDIOPHILE", pb.audiophile) { ServiceLocator.playback.setAudiophile(!pb.audiophile) }
                 }
                 Txt(hello, size = 34.sp, weight = FontWeight.ExtraBold)
@@ -131,7 +131,7 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
             item {
                 Panel("Update available · v${u.version}", pad.padding(top = 16.dp)) {
                     Txt(
-                        u.notes.lines().filter { it.isNotBlank() }.take(4).joinToString("\n").ifBlank { "A new version of Melodyne is ready." },
+                        u.notes.lines().filter { it.isNotBlank() }.take(4).joinToString("\n").ifBlank { "A new version of Vina is ready." },
                         size = 13.sp, color = Amoled.Muted, maxLines = 6,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -153,7 +153,7 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
             Box(pad.padding(top = 20.dp)) {
                 if (last != null) HeroCard(last) { conn.play(s.recents, 0) }
                 else Panel("Make your first mix") {
-                    Txt("Describe a mood and Melodyne builds a playlist you can play right away.", size = 13.sp, color = Amoled.Muted, maxLines = 3)
+                    Txt("Describe a mood and Vina builds a playlist you can play right away.", size = 13.sp, color = Amoled.Muted, maxLines = 3)
                     Pill("Try AI Mix", onClick = onOpenAi)
                 }
             }

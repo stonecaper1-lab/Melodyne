@@ -30,7 +30,7 @@ data class PlayStat(
 data class LibraryData(val playlists: List<UserPlaylist> = emptyList(), val stats: List<PlayStat> = emptyList())
 
 @Serializable
-data class LibraryBackup(val app: String = "melodyne", val version: Int = 1, val exportedAt: Long = 0, val library: LibraryData = LibraryData())
+data class LibraryBackup(val app: String = "vina", val version: Int = 1, val exportedAt: Long = 0, val library: LibraryData = LibraryData())
 
 data class SmartList(val id: String, val name: String, val blurb: String, val songs: List<Song>)
 

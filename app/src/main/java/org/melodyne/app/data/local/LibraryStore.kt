@@ -105,9 +105,9 @@ class LibraryStore(private val dir: File, private val json: Json, legacy: Shared
         val backup = try {
             json.decodeFromString(LibraryBackup.serializer(), text)
         } catch (e: Exception) {
-            throw IllegalArgumentException("This isn't a Melodyne library file.")
+            throw IllegalArgumentException("This isn't a Vina library file.")
         }
-        require(backup.app == "melodyne") { "This isn't a Melodyne library file." }
+        require(backup.app == "melodyne" || backup.app == "vina") { "This isn't a Vina library file." }
         var changed = 0
         change { cur -> val (merged, n) = LibraryOps.merge(cur, backup.library); changed = n; merged }
         return changed

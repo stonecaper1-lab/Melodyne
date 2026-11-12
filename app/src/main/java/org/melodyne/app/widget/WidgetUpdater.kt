@@ -111,7 +111,7 @@ object WidgetUpdater {
         val v = RemoteViews(ctx.packageName, layout)
         val idle = s.title.isBlank()
         val accent = ServiceLocator.prefs.getInt("w_accent", DEFAULT_ACCENT)
-        v.setTextViewText(R.id.w_title, if (idle) "Melodyne" else s.title)
+        v.setTextViewText(R.id.w_title, if (idle) "Vina" else s.title)
         v.setTextViewText(R.id.w_artist, if (idle) "Nothing playing yet" else s.artist)
         v.setTextViewText(R.id.w_quality, if (idle) "" else s.quality)
         v.setTextViewText(R.id.w_time, if (idle || s.durationMs <= 0) "" else WidgetMath.clock(s.positionMs) + " / " + WidgetMath.clock(s.durationMs))

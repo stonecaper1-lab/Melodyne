@@ -1,103 +1,51 @@
-# Melodyne
+# Vina
 
-<div align="center">
+A tiny, free-software music player for Android. Kotlin + Jetpack Compose (no Material), Media3/ExoPlayer,
+Retrofit/OkHttp. No Firebase, no Google Play Services, no analytics, no ads.
 
-<img src="https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
-<img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
-<img src="https://img.shields.io/badge/Free%20Software-00C7B7?style=for-the-badge" alt="Free software" />
-<img src="https://img.shields.io/badge/No%20Ads-FF6B6B?style=for-the-badge" alt="No ads" />
+## Build (no local Android SDK needed)
+Push the repo to GitHub and run the `build-apk` workflow. It runs the unit tests, builds with R8 and fails
+if the APK is 5,000,000 bytes or larger. Local: `gradle :app:assembleRelease` (Gradle 8.9, JDK 17, SDK 34).
+`app/melodyne-dev.jks` is a PUBLIC dev key so new builds install over old ones; replace it before sharing builds.
 
-## Listen better. Feel less noise.
+## How it works
+- **Music source**: `ChainRepository` tries an optional custom source (Settings), then the built-in catalogue.
+  Results are cleaned by `Refine` (duplicate versions collapsed, exact title matches first).
+  Failures are listed in the error card so you can see what broke.
+- **Streams**: the highest bitrate offered (320 kbps AAC when available), forced to https.
+- **Quality badge**: `QualityMonitor` reads the Format ExoPlayer feeds the decoder and publishes it through
+  MediaSession extras. Green dot = bitrate read from the stream header; amber = the server's label only.
+  Tap the badge for a plain explanation. It shows what the file *declares*, not a spectral analysis.
+- **Equalizer** (Now Playing -> EQ): seven bands (60, 170, 450, 1k, 2.5k, 6k, 14k Hz), pure curves only.
+  `EqProcessor` runs inside the audio sink in double precision with automatic headroom (no clipping).
+  Flat or off = input copied through untouched. Touch any band to make a Custom curve.
+- **Library**: custom playlists (create, rename, reorder, remove), smart playlists built from play history and
+  track length, import/export as JSON via the system file picker, add-to-playlist from any song (+).
+  Stored in `filesDir/library.json` with atomic writes and a rolling `.bak`, opted into Android backup
+  (`backup_rules.xml`). "Clear cache" can't touch it; "Clear storage" or uninstalling will, so use Export.
+- **AI Mix**: bring your own key for any OpenAI-compatible `/chat/completions` endpoint. Quick mix needs no key.
+- **Scrobbling**: Last.fm, with your own free API key entered in Settings; failed scrobbles are queued.
+- **Crash recorder**: uncaught exceptions are saved locally and shown in Settings -> Last crash.
 
-A tiny, free-software music player for Android built for people who want music to feel calm, honest, and alive.
+## Audiophile Mode, Audio Tuning, Updates
+- **Audiophile Mode** (Home): EQ, normalisation and crossfade are bypassed. The signal-chain sheet reports source, single-stage decode,
+  processing, the OS path (bit-perfect USB on Android 14+, otherwise whether Android must resample) and the output route.
+  Apps cannot switch off Android's mixer or Bluetooth re-encoding; the sheet says so instead of pretending.
+- **Normalisation**: BS.1770 K-weighted loudness measured over the first seconds of each song, gain to -14 LUFS (+3/-12 dB limits, peak-aware),
+  faded in and remembered per song. Gapless is automatic when files declare delay/padding. Crossfade is planned (needs a second decoder).
+- **Updates**: the app checks the latest GitHub release at most every 6 hours and shows a banner; nothing installs automatically.
 
-[Download latest APK](https://github.com/stonecaper1-lab/Melodyne/releases/latest) · [View releases](https://github.com/stonecaper1-lab/Melodyne/releases) · [Build from source](#build)
-
-</div>
-
----
-
-Melodyne is a music player designed around one simple idea: the app should help you listen, not compete with the music.
-
-No signup. No ads. No hidden analytics. Just a focused player that gives you the signal, the mood, and the flow you want.
-
-## Why Melodyne
-
-- 🎵 Less clutter, more listening.
-- 🔊 Real playback data, not marketing copy.
-- 🎧 Cleaner signal path when you want it.
-- 🧠 Discovery that feels personal, not noisy.
-- 🧩 Playlists and controls that stay out of your way.
-
-## The experience
-
-### Sound that feels honest
-
-Melodyne shows live bitrate and audio details as the track plays, so you can see what the stream is actually doing in real time instead of trusting a file header or a vague status label.
-
-### Tune without the drama
-
-Use a seven-band EQ, gentle loudness shaping, and a cleaner Audiophile Mode when you want the sound path to stay as direct as possible.
-
-### Make it feel like your own
-
-Choose your preferred skin, build playlists, discover moods, and let the app keep the queue moving when you're in the mood for something new.
-
-### Built for a good listening session
-
-Whether you're commuting, working, winding down, or just trying to get the vibe back, Melodyne is meant to be simple, personal, and intentionally calm.
-
-## Features
-
-| Feature | What it means |
-| --- | --- |
-| 🎚️ Equalizer | Shape the tone with a seven-band EQ and headroom-aware tuning. |
-| 🎧 Audiophile Mode | Bypass Melodyne’s own processing for a cleaner path to the output. |
-| 📈 Live bitrate | Watch a song’s actual playback stats as it runs. |
-| 🔁 Infinite play | Keep the queue moving with suggestions that match your mood. |
-| 🧩 Smart playlists | Build collections around listening history and track length. |
-| 🤖 AI Mix | Connect to an OpenAI-compatible endpoint using your own key. |
-| 🧪 Last.fm | Add richer discovery and scrobbles with your own API key. |
-
-## Get it
-
-Download the latest APK from the [releases page](https://github.com/stonecaper1-lab/Melodyne/releases/latest):
-
-```text
-https://github.com/stonecaper1-lab/Melodyne/releases/latest/download/melodyne.apk
-```
-
-## Build
-
-Local build:
-
-```bash
-gradle :app:assembleRelease
-```
-
-Requirements:
-- JDK 17
-- Gradle 8.9
-- Android SDK 34
-
-Or run the `build-apk` GitHub Action to build and test without a local Android SDK setup.
-
-> `app/melodyne-dev.jks` is a public development key so test builds can replace each other during development. Replace it before distributing a public build.
-
-## Tech stack
-
-Melodyne is built in Kotlin using Jetpack Compose and Media3/ExoPlayer. Networking uses Retrofit + OkHttp, and the app intentionally avoids Firebase, Google Play Services, analytics, and ad SDKs.
-
-## Current limitations
-
-- 📁 Local music files stored on the phone are not supported yet.
-- 🔐 AI Mix with a custom endpoint requires your own API key.
-- 📁 Local music files stored on the phone are not supported yet.
+## Look and feel, bitrate, endless play
+- **Liquid glass** (`ui/Glass.kt`): `glass()` and `glassSheet()` modifiers, `AmbientGlow`, a springy glass nav bar. Glow is optional.
+- **Live bitrate** (`player/BitrateMeter.kt`): a wrapper around ExoPlayer's extractors records every audio frame's size and timestamp.
+  kbps at any second = bytes in that second x 8. Idempotent, so seeking never double-counts.
+- **Infinite play** (`data/repo/InfiniteService.kt`) and **genre cloud** (`data/repo/GenreService.kt`) both lean on Last.fm.
+- **Crossfade** (`player/CrossfadeEngine.kt`): a helper "tail" player carries the outgoing song while the main player starts the next.
 
 ## Releases
+Uploading `vina-source.zip` makes the workflow commit the real source as "Vina vX.Y.Z", build, and publish a release with
+the notes from the top of CHANGELOG.md. The newest APK is always at `releases/latest/download/vina.apk`.
 
-The release workflow publishes the APK and uses the notes at the top of [`CHANGELOG.md`](CHANGELOG.md). You can browse all builds in the [releases tab](https://github.com/stonecaper1-lab/Melodyne/releases).
-
----
-
-Made for listeners who want a music player that feels more human and a lot less like a dashboard.
+## Known gaps
+- Tracks from files on the phone aren't supported yet; playlists hold streamed songs.
+- Session key and API keys are stored in plain app preferences.

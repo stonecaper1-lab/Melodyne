@@ -99,7 +99,7 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
-        // Tapping the notification or lock-screen card opens Melodyne straight on the Now Playing screen.
+        // Tapping the notification or lock-screen card opens Vina straight on the Now Playing screen.
         val openApp = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java)
@@ -122,6 +122,8 @@ class PlaybackService : MediaSessionService() {
             }
         })
         engine = CrossfadeEngine(player, { newTailPlayer() }, ServiceLocator.playback, ServiceLocator.normalizer, scope).also { it.attach() }
+
+        SleepEngine(player, ServiceLocator.sleep, scope) { engine?.isFading == true }.attach()
 
         // Audiophile Mode bypasses every processor; otherwise the EQ and normalisation follow the user's settings.
         scope.launch {

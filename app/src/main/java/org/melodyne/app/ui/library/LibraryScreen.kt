@@ -143,7 +143,7 @@ private fun Home(
         message?.let { m -> item { Txt(m, pad.padding(top = 12.dp), size = 13.sp, color = accent, maxLines = 3) } }
 
         item { SectionTitle("Smart playlists") }
-        if (smart.isEmpty()) item { Txt("Play a few songs and Melodyne starts building playlists from your habits.", pad, size = 13.sp, color = Amoled.Muted, maxLines = 3) }
+        if (smart.isEmpty()) item { Txt("Play a few songs and Vina starts building playlists from your habits.", pad, size = 13.sp, color = Amoled.Muted, maxLines = 3) }
         items(smart) { (id, name, sub) -> ListRow(name, sub, outlined = true) { onOpen(id, true) } }
 
         item { SectionTitle("Your playlists") }

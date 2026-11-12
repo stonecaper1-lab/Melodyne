@@ -97,8 +97,11 @@ class UpdateChecker(
         }
     }
 
-    private suspend fun fetch(): UpdateInfo = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url("https://api.github.com/repos/$repo/releases/latest")
+    private suspend fun fetch(): UpdateInfo =
+        try { fetchFrom(repo) } catch (e: IOException) { if (repo == DEFAULT_REPO) fetchFrom(LEGACY_REPO) else throw e }
+
+    private suspend fun fetchFrom(name: String): UpdateInfo = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url("https://api.github.com/repos/$name/releases/latest")
             .header("Accept", "application/vnd.github+json")
             .apply { if (token.isNotBlank()) header("Authorization", "Bearer $token") }
             .build()
@@ -113,7 +116,7 @@ class UpdateChecker(
             val tag = o.text("tag_name") ?: throw IOException("unexpected reply")
             val apks = (o["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
                 .filter { it.text("name")?.endsWith(".apk") == true }
-            val apk = (apks.firstOrNull { it.text("name") == "melodyne.apk" } ?: apks.firstOrNull())?.text("browser_download_url")
+            val apk = (apks.firstOrNull { it.text("name") == "vina.apk" } ?: apks.firstOrNull { it.text("name") == "melodyne.apk" } ?: apks.firstOrNull())?.text("browser_download_url")
             UpdateInfo(tag.removePrefix("v"), o.text("body").orEmpty().trim(), o.text("html_url").orEmpty(), apk)
         }
     }
@@ -122,7 +125,9 @@ class UpdateChecker(
     private fun JsonArray?.orEmpty(): List<kotlinx.serialization.json.JsonElement> = this?.toList() ?: emptyList()
 
     companion object {
-        const val DEFAULT_REPO = "stonecaper1-lab/Melodyne"
+        const val DEFAULT_REPO = "stonecaper1-lab/Vina"
+        /** The project used to be called Melodyne; GitHub keeps redirecting, but try the old name too if the new one 404s. */
+        const val LEGACY_REPO = "stonecaper1-lab/Melodyne"
         private const val SIX_HOURS = 6L * 3600 * 1000
 
         /** "v0.10.1" is newer than "0.9.4"; missing parts count as zero. */

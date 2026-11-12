@@ -138,7 +138,7 @@ private fun AmpBody(st: SkinState, act: SkinActions, modifier: Modifier) {
     val playing = st.ps.isPlaying
 
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        AmpWindow("MELODYNE AMP", onShade = { shade = !shade }, onClose = act.onClose) {
+        AmpWindow("VINA AMP", onShade = { shade = !shade }, onClose = act.onClose) {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).background(Color(0xFF040E08)).border(2.dp, Color(0xFF1B2A20), RoundedCornerShape(2.dp))
                     .scanlines().padding(10.dp),
@@ -313,7 +313,7 @@ private fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
             Txt("C-90", Modifier.align(Alignment.TopEnd).padding(top = 28.dp, end = 34.dp).background(Color(0xFFD94F3D)).padding(horizontal = 6.dp, vertical = 2.dp),
                 size = 11.sp, weight = FontWeight.Black, color = Color.White, fontFamily = MONO)
             Txt("A", Modifier.align(Alignment.TopStart).padding(top = 12.dp, start = 14.dp), size = 11.sp, weight = FontWeight.Black, color = Color(0xFF2B2420), fontFamily = MONO)
-            Txt("MELODYNE  TYPE II  CHROME", Modifier.align(Alignment.BottomCenter).padding(bottom = 17.dp), size = 9.sp, weight = FontWeight.Bold, color = Color(0xFF6B5A44), fontFamily = MONO)
+            Txt("VINA  TYPE II  CHROME", Modifier.align(Alignment.BottomCenter).padding(bottom = 17.dp), size = 9.sp, weight = FontWeight.Bold, color = Color(0xFF6B5A44), fontFamily = MONO)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             VuMeter(levels.value.l, "L", Modifier.weight(1f))

@@ -10,6 +10,8 @@ import org.melodyne.app.ai.AiClient
 import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.audio.EQ_BANDS
 import org.melodyne.app.audio.Tpdf
+import org.melodyne.app.player.SleepTimer
+import org.melodyne.app.player.SleepUi
 import org.melodyne.app.ui.skins.SevenSegments
 import org.melodyne.app.ui.skins.Skins
 import org.melodyne.app.ui.skins.mmss
@@ -295,5 +297,15 @@ class CoreTest {
         assertEquals("03:07", mmss(187_000)); assertEquals("00:00", mmss(0)); assertEquals("01:05", mmss(-65_000))
         assertEquals(250, WidgetMath.progress(50, 200)); assertEquals(1000, WidgetMath.progress(500, 200)); assertEquals(0, WidgetMath.progress(5, 0))
         assertEquals("3:07", WidgetMath.clock(187_000))
+    }
+
+    // ---- sleep timer ----
+    @Test fun sleepFadeAndLabelsBehave() {
+        assertEquals(1f, SleepTimer.fadeFactor(60_000), 1e-6f)
+        assertEquals(0.5f, SleepTimer.fadeFactor(10_000), 1e-6f)
+        assertEquals(0f, SleepTimer.fadeFactor(0), 1e-6f)
+        assertEquals("12:34", SleepUi(endAt = 1, remainingMs = 754_000).label())
+        assertEquals("End of this song", SleepUi(endOfSong = true).label())
+        assertTrue(SleepUi(endOfSong = true).active); assertFalse(SleepUi().active)
     }
 }

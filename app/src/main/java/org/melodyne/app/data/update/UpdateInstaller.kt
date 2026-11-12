@@ -20,7 +20,7 @@ object UpdateInstaller {
     fun canAutoDownload(info: UpdateInfo): Boolean = info.apkUrl != null && ServiceLocator.updates.token.isBlank()
 
     private fun fileFor(ctx: Context, version: String): File? =
-        ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.let { File(it, "Melodyne-v$version.apk") }
+        ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.let { File(it, "Vina-v$version.apk") }
 
     fun download(ctx: Context, info: UpdateInfo): Boolean {
         val url = info.apkUrl ?: return false
@@ -30,7 +30,7 @@ object UpdateInstaller {
             file.delete()
             val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val request = DownloadManager.Request(Uri.parse(url))
-                .setTitle("Melodyne v${info.version}")
+                .setTitle("Vina v${info.version}")
                 .setDescription("Downloading the update")
                 .setMimeType(APK)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)

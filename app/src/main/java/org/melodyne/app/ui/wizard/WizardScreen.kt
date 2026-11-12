@@ -52,7 +52,7 @@ private data class TourPage(val kicker: String, val title: String, val body: Str
 private val PAGES = listOf(
     TourPage(
         "WELCOME", "Music, without the noise",
-        "Melodyne is a free, tiny music player. No accounts, no ads, no trackers, and your library never leaves your phone.",
+        "Vina is a free, tiny music player. No accounts, no ads, no trackers, and your library never leaves your phone.",
         listOf(
             "Measured, not claimed" to "What you see about the sound is counted from the audio itself.",
             "Nothing added by default" to "Your music isn't boosted, squeezed or re-encoded unless you ask.",
@@ -73,7 +73,7 @@ private val PAGES = listOf(
         "Audiophile Mode bypasses the EQ, volume normalisation and crossfade, so the song reaches your phone's output exactly as decoded.",
         listOf(
             "Signal chain" to "Source, decode, processing, OS path and output, with the point where it stops being clean.",
-            "USB DAC, Android 14+" to "Melodyne asks for Android's bit-perfect path, so nothing resamples it.",
+            "USB DAC, Android 14+" to "Vina asks for Android's bit-perfect path, so nothing resamples it.",
             "What it can't do" to "A 320 kbps AAC stream is lossy; we can only avoid making it worse. Bluetooth always re-encodes.",
         ),
     ),

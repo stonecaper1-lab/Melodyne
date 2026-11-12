@@ -163,7 +163,7 @@ fun SettingsScreen() {
                     if (mgr.isRequestPinAppWidgetSupported) mgr.requestPinAppWidget(android.content.ComponentName(ctx, org.melodyne.app.widget.NowPlayingWidget::class.java), null, null)
                 }
             }
-            Txt("Or long-press your home screen, choose Widgets, then Melodyne.", size = 12.sp, color = Amoled.Muted, maxLines = 2)
+            Txt("Or long-press your home screen, choose Widgets, then Vina.", size = 12.sp, color = Amoled.Muted, maxLines = 2)
             Pill("Replay the welcome tour", filled = false) { openTour() }
         }
 
@@ -219,7 +219,7 @@ fun SettingsScreen() {
 
         Panel("Custom source (optional)") {
             Txt(
-                "Melodyne has a built-in music source. If you run a compatible server of your own, put its https address here and it will be tried first.",
+                "Vina has a built-in music source. If you run a compatible server of your own, put its https address here and it will be tried first.",
                 size = 13.sp, color = Amoled.Muted, maxLines = 5,
             )
             Field(host, { host = it }, "https://your-instance.example/api", keyboard = KeyboardType.Uri)
@@ -251,7 +251,7 @@ fun SettingsScreen() {
             Txt(s.updateStatus, size = 13.sp, color = if (update != null) Amoled.Ok else Amoled.Muted, maxLines = 3)
             var notifyOn by remember { mutableStateOf(ServiceLocator.updates.notifyEnabled) }
             ToggleRow(
-                "Update notifications", "A check every few hours, even when Melodyne is closed. Tap the notification and the download starts by itself.",
+                "Update notifications", "A check every few hours, even when Vina is closed. Tap the notification and the download starts by itself.",
                 if (notifyOn) "On" else "Off", notifyOn,
             ) {
                 notifyOn = !notifyOn
@@ -260,8 +260,8 @@ fun SettingsScreen() {
             }
             Pill("Check now") { vm.checkUpdates() }
             Txt(
-                "Melodyne looks at the project's latest GitHub release when it opens (at most every 6 hours). Nothing installs by itself; " +
-                    "A new version downloads inside Melodyne and Android then asks you to install it (the first time you will be asked to allow installs from Melodyne). A private repository needs a read-only GitHub token and opens the release page instead.",
+                "Vina looks at the project's latest GitHub release when it opens (at most every 6 hours). Nothing installs by itself; " +
+                    "A new version downloads inside Vina and Android then asks you to install it (the first time you will be asked to allow installs from Vina). A private repository needs a read-only GitHub token and opens the release page instead.",
                 size = 12.sp, color = Amoled.Muted, maxLines = 6,
             )
             Field(updRepo, { updRepo = it }, "owner/repository")
@@ -281,7 +281,7 @@ fun SettingsScreen() {
 
         Panel("About") {
             Txt(
-                "Melodyne ${BuildConfig.VERSION_NAME}",
+                "Vina ${BuildConfig.VERSION_NAME}",
                 Modifier.clickable {
                     val now = System.currentTimeMillis()
                     taps = if (now - lastTap.longValue < 1500) taps + 1 else 1
@@ -291,6 +291,7 @@ fun SettingsScreen() {
                 size = 15.sp, weight = FontWeight.SemiBold,
             )
             Txt("Free software. No trackers, no ads, no analytics, no accounts.", size = 12.sp, color = Amoled.Muted, maxLines = 3)
+            Txt("Stonecaper loves 1509", size = 13.sp, weight = FontWeight.SemiBold, color = LocalAccent.current)
         }
     }
 }

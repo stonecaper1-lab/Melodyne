@@ -21,11 +21,11 @@ object UpdateNotifier {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "App updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "Tells you when a new version of Melodyne is available"
+            description = "Tells you when a new version of Vina is available"
         })
     }
 
-    /** "Melodyne vX is ready". Tapping it starts the download (or opens the release page when a direct download isn't possible). */
+    /** "Vina vX is ready". Tapping it starts the download (or opens the release page when a direct download isn't possible). */
     fun show(ctx: Context, info: UpdateInfo) {
         ensureChannel(ctx)
         val auto = UpdateInstaller.canAutoDownload(info)
@@ -42,7 +42,7 @@ object UpdateNotifier {
         val notes = info.notes.lines().filter { it.isNotBlank() }.take(5).joinToString("\n")
         val n = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_melodyne)
-            .setContentTitle("Melodyne v${info.version} is ready")
+            .setContentTitle("Vina v${info.version} is ready")
             .setContentText(if (auto) "Tap to download the update" else "Tap to open the release")
             .setStyle(NotificationCompat.BigTextStyle().bigText((if (auto) "Tap to download it; I'll ask you to install when it's ready.\n\n" else "") + notes))
             .setContentIntent(tap)
@@ -59,10 +59,10 @@ object UpdateNotifier {
             .setSmallIcon(R.drawable.ic_stat_melodyne)
             .setAutoCancel(true)
         if (install != null) {
-            builder.setContentTitle("Melodyne v$version downloaded").setContentText("Tap to install")
+            builder.setContentTitle("Vina v$version downloaded").setContentText("Tap to install")
                 .setContentIntent(PendingIntent.getActivity(ctx, 12, install, FLAGS))
         } else {
-            builder.setContentTitle("The update didn't download").setContentText("Open Melodyne > Settings > Updates to try again")
+            builder.setContentTitle("The update didn't download").setContentText("Open Vina > Settings > Updates to try again")
         }
         runCatching { NotificationManagerCompat.from(ctx).notify(ID_READY, builder.build()) }
     }
