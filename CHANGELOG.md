@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.9.3
+- The Classic Amp skin now takes the whole screen: the status and navigation bars are hidden while it is showing (swipe from the edge to peek) and come back when you leave, and it draws around a camera notch. The main window sits on top, the Equalizer window opens under it, and the lower window fills the rest of the screen as a scrolling playlist or a big spectrum analyser. EQ, PL, LYR, INF and MENU buttons replace the old top bar; the window's close button leaves the screen.
+
 ## v0.9.2
 - Clears its cache when the app closes: artwork, buffered audio, Last.fm lookups and finished update downloads are deleted when you swipe Vina away (never while music is playing). Your library, playlists and settings are untouched. If Android ended the app without warning, the next start tidies up when more than 20 MB was left behind.
 - Settings > Storage: a switch for this (on by default), the current cache size, and a Clear now button.

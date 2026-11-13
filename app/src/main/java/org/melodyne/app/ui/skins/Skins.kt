@@ -16,7 +16,7 @@ object Skins {
         SkinSpec(LIQUID, "Liquid", "The default: liquid glass, blurred artwork and your song's own colour.", Color(0xFF1DE9B6)),
         SkinSpec(
             "amp", "Classic Amp",
-            "The 90s desktop player, window by window: a titled main window you can shade or close, seven-segment time (tap to flip elapsed and remaining), a real spectrum with falling peak caps, live kbps and kHz, a scrolling title, green-to-red volume and balance bars, an Equalizer window with your seven bands and a playlist window you can tap to jump around.",
+            "The 90s desktop player, full screen with the status bar hidden (swipe from the edge to peek), window by window: a titled main window you can shade or close, seven-segment time (tap to flip elapsed and remaining), a real spectrum with falling peak caps, live kbps and kHz, a scrolling title, green-to-red volume and balance bars, an Equalizer window with your seven bands and a playlist window you can tap to jump around.",
             Color(0xFF00FF66),
         ),
         SkinSpec(

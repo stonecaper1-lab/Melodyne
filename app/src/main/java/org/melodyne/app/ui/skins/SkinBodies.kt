@@ -16,6 +16,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.rememberUpdatedState
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.runtime.State
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -84,6 +91,7 @@ class SkinActions(
     val onToggle: () -> Unit, val onNext: () -> Unit, val onPrev: () -> Unit, val onSeekTo: (Long) -> Unit,
     val onEq: () -> Unit, val onLyrics: () -> Unit, val onQueue: () -> Unit,
     val onClose: () -> Unit, val queue: () -> Pair<List<Song>, Int>, val onJump: (Int) -> Unit,
+    val onMenu: () -> Unit = {},
 )
 
 @Composable
@@ -123,21 +131,27 @@ private fun SkinActions.scrub(st: SkinState, dir: Int) =
 private fun SkinActions.stop(st: SkinState) { if (st.ps.isPlaying) onToggle(); onSeekTo(0L) }
 
 // ================================================================== Classic Amp
-/** A 90s desktop player: titled windows (with shade and close), 7-segment time, spectrum with falling caps, a playlist window. */
+/**
+ * The 90s desktop player, full screen: a titled main window on top (shade it, or close the screen), the Equalizer window
+ * under it when you ask, and a lower window that takes every remaining pixel as a playlist or a big spectrum.
+ */
 @Composable
 private fun AmpBody(st: SkinState, act: SkinActions, modifier: Modifier) {
     val levels = rememberLevels(st.ps.isPlaying)
     val volume = rememberSystemVolume()
     var remaining by remember { mutableStateOf(false) }
     var shade by remember { mutableStateOf(false) }
-    var playlist by remember { mutableStateOf(false) }
+    var playlist by remember { mutableStateOf(true) }
     var eqWin by remember { mutableStateOf(false) }
     val eq by ServiceLocator.eq.state.collectAsState()
     val green = Color(0xFF00FF66)
     val timeText = (if (remaining) "-" else "") + mmss(if (remaining) st.dur.longValue - st.pos.longValue else st.pos.longValue)
     val playing = st.ps.isPlaying
 
-    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         AmpWindow("VINA AMP", onShade = { shade = !shade }, onClose = act.onClose) {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).background(Color(0xFF040E08)).border(2.dp, Color(0xFF1B2A20), RoundedCornerShape(2.dp))
@@ -147,17 +161,7 @@ private fun AmpBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                 Row(verticalAlignment = Alignment.Top) {
                     Box(Modifier.clickable { remaining = !remaining }) { SevenSeg(timeText, green, 16.dp, 30.dp) }
                     Spacer(Modifier.weight(1f))
-                    if (!shade) Canvas(Modifier.size(width = 150.dp, height = 44.dp)) {
-                        val f = levels.value
-                        val bw = size.width / 16f
-                        val brush = Brush.verticalGradient(listOf(Color(0xFFFF3B2F), Color(0xFFFFE600), Color(0xFF00E050)), startY = 0f, endY = size.height)
-                        for (i in 0 until 16) {
-                            val h = size.height * f.bands[i].coerceIn(0f, 1f)
-                            drawRect(brush, Offset(i * bw + 1f, size.height - h), Size(bw - 2f, h))
-                            val cy = size.height - size.height * f.caps[i].coerceIn(0f, 1f)
-                            drawRect(Color(0xFFB8FFD0), Offset(i * bw + 1f, cy - 2f), Size(bw - 2f, 2f))
-                        }
-                    }
+                    if (!shade) Canvas(Modifier.size(width = 150.dp, height = 44.dp)) { drawSpectrum(levels.value, 16) }
                 }
                 Marquee("${st.ps.title} - ${st.ps.artist}", green, 14)
                 if (!shade) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -182,15 +186,18 @@ private fun AmpBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                     RetroBtn(G.Stop, green, width = 48.dp) { act.stop(st) }
                     RetroBtn(G.Next, green, width = 48.dp, onClick = act.onNext)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LabelBtn("EQ", green, eqWin) { eqWin = !eqWin }
-                    LabelBtn("PL", green, playlist) { playlist = !playlist }
-                    LabelBtn("LYR", green, false, act.onLyrics)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AmpBtn("EQ", green, eqWin) { eqWin = !eqWin }
+                    AmpBtn("PL", green, playlist) { playlist = !playlist }
+                    AmpBtn("LYR", green, false, act.onLyrics)
+                    AmpBtn("INF", green, st.infinite) { ServiceLocator.playback.setInfinite(!st.infinite) }
+                    AmpBtn("MENU", green, false, act.onMenu)
                     Spacer(Modifier.weight(1f))
-                    Lamp("PURE", st.audiophile, green); Lamp("INF", st.infinite, green)
+                    Lamp("PURE", st.audiophile, green)
                 }
             }
         }
+
         // The equalizer window: the same seven bands as everywhere else. "Preamp" is the automatic headroom that keeps boosts from clipping.
         if (eqWin) AmpWindow("EQUALIZER", onShade = null, onClose = { eqWin = false }) {
             val gains = eq.gains
@@ -208,28 +215,84 @@ private fun AmpBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                 gains.forEachIndexed { i, g -> AmpBand(org.melodyne.app.audio.EQ_LABELS[i], g, green) { ServiceLocator.eq.setBand(i, it) } }
             }
         }
-        if (playlist) AmpWindow("PLAYLIST EDITOR", onShade = null, onClose = { playlist = false }) {
-            val (queue, index) = remember(st.ps.songId) { act.queue() }
-            Column(Modifier.fillMaxWidth().background(Color(0xFF040E08)).padding(8.dp)) {
-                queue.take(80).forEachIndexed { i, s ->
+
+        // The lower window fills whatever is left of the screen.
+        AmpWindow(
+            if (playlist) "PLAYLIST EDITOR" else "VISUALIZATION", onShade = null, onClose = { playlist = !playlist },
+            modifier = Modifier.weight(1f), fill = true,
+        ) {
+            if (playlist) AmpPlaylist(st, act, green) else AmpVis(levels, st, green)
+        }
+    }
+}
+
+private fun DrawScope.drawSpectrum(f: LevelFrame, n: Int) {
+    val bw = size.width / n
+    val brush = Brush.verticalGradient(listOf(Color(0xFFFF3B2F), Color(0xFFFFE600), Color(0xFF00E050)), startY = 0f, endY = size.height)
+    for (i in 0 until n) {
+        val h = size.height * f.bands[i].coerceIn(0f, 1f)
+        drawRect(brush, Offset(i * bw + 1f, size.height - h), Size(bw - 2f, h))
+        val cy = size.height - size.height * f.caps[i].coerceIn(0f, 1f)
+        drawRect(Color(0xFFB8FFD0), Offset(i * bw + 1f, cy - 2f), Size(bw - 2f, 2f))
+    }
+}
+
+@Composable
+private fun AmpPlaylist(st: SkinState, act: SkinActions, green: Color) {
+    val (queue, index) = remember(st.ps.songId) { act.queue() }
+    val listState = rememberLazyListState()
+    LaunchedEffect(index, queue.size) { if (queue.isNotEmpty()) listState.animateScrollToItem((index - 2).coerceAtLeast(0)) }
+    Box(Modifier.fillMaxSize().background(Color(0xFF040E08)).scanlines(0.12f).padding(6.dp)) {
+        if (queue.isEmpty()) Txt("Nothing queued.", size = 12.sp, color = green.copy(alpha = 0.6f), fontFamily = MONO)
+        else LazyColumn(Modifier.fillMaxSize(), state = listState) {
+            itemsIndexed(queue) { i, s ->
+                val here = i == index
+                Row(Modifier.fillMaxWidth().clickable { act.onJump(i) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Txt("${i + 1}.", Modifier.width(34.dp), size = 12.sp, fontFamily = MONO, color = green.copy(alpha = if (here) 1f else 0.6f))
                     Txt(
-                        "${i + 1}. ${s.title} - ${s.artist}",
-                        Modifier.fillMaxWidth().clickable { act.onJump(i) }.padding(vertical = 3.dp),
-                        size = 12.sp, fontFamily = MONO, weight = if (i == index) FontWeight.Bold else FontWeight.Normal,
-                        color = if (i == index) Color(0xFFE6FFE9) else green.copy(alpha = 0.75f),
+                        "${s.title} - ${s.artist}", Modifier.weight(1f), size = 12.sp, fontFamily = MONO, maxLines = 1,
+                        weight = if (here) FontWeight.Bold else FontWeight.Normal, color = if (here) Color(0xFFE6FFE9) else green.copy(alpha = 0.78f),
                     )
+                    if (s.durationSec > 0) Txt(mmss(s.durationSec * 1000L), Modifier.padding(start = 8.dp), size = 11.sp, fontFamily = MONO, color = green.copy(alpha = 0.6f))
                 }
-                if (queue.isEmpty()) Txt("Nothing queued.", size = 12.sp, color = green.copy(alpha = 0.6f), fontFamily = MONO)
             }
         }
     }
 }
 
-/** A titled window with the little stripes and buttons of a 90s desktop player. */
+/** The big analyser: the same real 16 bands as the little one, across the whole window. */
 @Composable
-private fun AmpWindow(title: String, onShade: (() -> Unit)?, onClose: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+private fun AmpVis(levels: State<LevelFrame>, st: SkinState, green: Color) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF040E08)).scanlines(0.15f)) {
+        Canvas(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 12.dp)) { drawSpectrum(levels.value, 16) }
+        Txt(
+            st.ps.title, Modifier.align(Alignment.TopStart).padding(10.dp), size = 12.sp, weight = FontWeight.Bold,
+            color = green.copy(alpha = 0.8f), fontFamily = MONO, maxLines = 1,
+        )
+    }
+}
+
+/** A compact retro button, small enough to fit five across the window. */
+@Composable
+private fun AmpBtn(text: String, color: Color, on: Boolean, onClick: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    Txt(
+        text,
+        Modifier.clip(RoundedCornerShape(4.dp)).background(if (on) color.copy(alpha = 0.25f) else Color(0xFF2A2E34))
+            .border(1.dp, if (on) color else Color(0xFF8A92A0), RoundedCornerShape(4.dp))
+            .clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick() }.padding(horizontal = 8.dp, vertical = 7.dp),
+        size = 11.sp, weight = FontWeight.Bold, color = if (on) color else Color(0xFFC8CDD6), fontFamily = MONO,
+    )
+}
+
+/** A titled window with the little stripes and buttons of a 90s desktop player. [fill] makes its body take the remaining height. */
+@Composable
+private fun AmpWindow(
+    title: String, onShade: (() -> Unit)?, onClose: () -> Unit, modifier: Modifier = Modifier, fill: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp)).background(Brush.verticalGradient(listOf(Color(0xFF3A3F47), Color(0xFF22262C))))
+        modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp)).background(Brush.verticalGradient(listOf(Color(0xFF3A3F47), Color(0xFF22262C))))
             .border(2.dp, Brush.linearGradient(listOf(Color(0xFF8A92A0), Color(0xFF14171B))), RoundedCornerShape(3.dp)),
     ) {
         Box(Modifier.fillMaxWidth().height(22.dp)) {
@@ -245,7 +308,10 @@ private fun AmpWindow(title: String, onShade: (() -> Unit)?, onClose: () -> Unit
                 Txt("×", Modifier.clickable(onClick = onClose).padding(horizontal = 8.dp), size = 14.sp, weight = FontWeight.Bold, color = Color.White, fontFamily = MONO)
             }
         }
-        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+        Column(
+            Modifier.padding(8.dp).then(if (fill) Modifier.weight(1f) else Modifier),
+            verticalArrangement = Arrangement.spacedBy(8.dp), content = content,
+        )
     }
 }
 

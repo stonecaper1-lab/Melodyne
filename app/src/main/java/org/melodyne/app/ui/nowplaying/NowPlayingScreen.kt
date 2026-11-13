@@ -90,6 +90,7 @@ import org.melodyne.app.ui.Chip
 import org.melodyne.app.ui.Cover
 import org.melodyne.app.ui.G
 import org.melodyne.app.ui.Glyph
+import org.melodyne.app.ui.ImmersiveMode
 import org.melodyne.app.ui.IconBtn
 import org.melodyne.app.ui.LocalAccent
 import org.melodyne.app.ui.LocalAddToPlaylist
@@ -176,6 +177,15 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
         if (ps.isPlaying) 1f else 0.92f, spring(stiffness = Spring.StiffnessMediumLow), label = "breathe",
     )
 
+    ImmersiveMode(enabled = pb.skinEffective == "amp")
+    val skinState = SkinState(ps, pos, dur, live, avg, pb.audiophile, eqState.shaping && !pb.audiophile, pb.infinite, pb.balance)
+    val skinActions = SkinActions(
+        onToggle = conn::toggle, onNext = conn::next, onPrev = conn::prev,
+        onSeekTo = { ms -> conn.seekTo(ms); pos.longValue = ms },
+        onEq = { showEq = true }, onLyrics = { showLyrics = true }, onQueue = { showQueue = true },
+        onClose = onClose, queue = { conn.queue() }, onJump = { conn.jumpTo(it) }, onMenu = { showMenu = true },
+    )
+
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
         // Liquid backdrop: the artwork, blurred and sunk into the dark. "Liquid glow" off keeps it pure AMOLED black.
         if (pb.skinEffective != Skins.LIQUID) Box(Modifier.fillMaxSize().background(Skins.background(pb.skinEffective)))
@@ -187,7 +197,10 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x99000000), Color(0xE6000000), Color.Black))))
         }
 
-        Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
+        // The Amp skin takes the whole screen: no top bar, no status bar, no navigation bar. Its own windows hold every control.
+        if (pb.skinEffective == "amp") {
+            SkinBody("amp", skinState, skinActions, Modifier.fillMaxSize())
+        } else Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
             // Top bar: close | title | infinite, EQ, add to playlist
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconBtn(G.Down, Amoled.OnBg, onClick = onClose)
@@ -270,17 +283,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
                 IconBtn(G.Next, Amoled.OnBg, glyphSize = 32.dp, onClick = conn::next)
             }
             } else {
-                SkinBody(
-                    pb.skinEffective,
-                    SkinState(ps, pos, dur, live, avg, pb.audiophile, eqState.shaping && !pb.audiophile, pb.infinite, pb.balance),
-                    SkinActions(
-                        onToggle = conn::toggle, onNext = conn::next, onPrev = conn::prev,
-                        onSeekTo = { ms -> conn.seekTo(ms); pos.longValue = ms },
-                        onEq = { showEq = true }, onLyrics = { showLyrics = true }, onQueue = { showQueue = true },
-                        onClose = onClose, queue = { conn.queue() }, onJump = { conn.jumpTo(it) },
-                    ),
-                    Modifier.weight(1f).padding(vertical = 8.dp),
-                )
+                SkinBody(pb.skinEffective, skinState, skinActions, Modifier.weight(1f).padding(vertical = 8.dp))
             }
         }
 
