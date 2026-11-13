@@ -56,7 +56,6 @@ export default function Home() {
           <a href="#sound">The sound</a>
           <a href="#skins">Skins</a>
           <a href={REPOSITORY} target="_blank" rel="noreferrer">Open source <span aria-hidden="true">↗</span></a>
-          <a className="nav-download" href={APK_DOWNLOAD}>Get Vina <span aria-hidden="true">↓</span></a>
         </nav>
       </header>
 
@@ -197,11 +196,11 @@ export default function Home() {
 
       <section className="download-section" id="download" aria-labelledby="download-title">
         <div className="download-orbit" aria-hidden="true"><i /><i /><i /></div>
-        <div className="download-copy"><p className="eyebrow">AN ANDROID PLAYER, STILL GROWING</p><h2 id="download-title">Come listen.<br /><span>Tell me what you think.</span></h2><p>Vina is a work in progress. Download the latest APK, explore the source, or share feedback with the project.</p><div className="download-actions"><a className="primary-button" href={APK_DOWNLOAD}>Download Vina for Android <span aria-hidden="true">↓</span></a><a className="text-link" href={GITHUB_ISSUES} target="_blank" rel="noreferrer">Share feedback <span aria-hidden="true">↗</span></a></div><p className="apk-note">Direct APK from GitHub Releases. Android may ask you to approve installation from your browser.</p></div>
-        <aside className="release-card" aria-label="Android download details"><span className="release-label"><i className="live-dot" /> LATEST ANDROID BUILD</span><span className="release-file">melodyne.apk</span><a href={APK_DOWNLOAD} className="release-link">Download directly <span aria-hidden="true">↗</span></a><a href={`${REPOSITORY}/releases`} className="release-secondary" target="_blank" rel="noreferrer">Release history</a></aside>
+        <div className="download-copy"><p className="eyebrow">AN ANDROID PLAYER, STILL GROWING</p><h2 id="download-title">Come listen.<br /><span>Tell me what you think.</span></h2><p>Vina is a work in progress. Explore the source or share feedback as the app grows. The single Android download button is at the top of the page.</p><div className="download-actions"><a className="primary-button" href={GITHUB_ISSUES} target="_blank" rel="noreferrer">Share feedback <span aria-hidden="true">↗</span></a><a className="text-link" href={REPOSITORY} target="_blank" rel="noreferrer">Explore the source <span aria-hidden="true">↗</span></a></div><p className="apk-note">Android may ask you to approve installation from your browser.</p></div>
+        <aside className="release-card" aria-label="Android download details"><span className="release-label"><i className="live-dot" /> LATEST ANDROID BUILD</span><span className="release-file">melodyne.apk</span><span className="release-secondary">Available from GitHub Releases</span><a href={`${REPOSITORY}/releases`} className="release-secondary" target="_blank" rel="noreferrer">Release history <span aria-hidden="true">↗</span></a></aside>
       </section>
 
-      <footer className="site-footer"><a className="footer-brand" href="#top">vina<span>.</span></a><span>Music, with the signal chain in view.</span><div><a href={REPOSITORY} target="_blank" rel="noreferrer">GitHub ↗</a><a href={APK_DOWNLOAD}>Android APK ↓</a></div></footer>
+      <footer className="site-footer"><a className="footer-brand" href="#top">vina<span>.</span></a><span>Music, with the signal chain in view.</span><div><a href={REPOSITORY} target="_blank" rel="noreferrer">GitHub ↗</a><a href="#top">Back to top ↑</a></div></footer>
     </main>
   )
 }
