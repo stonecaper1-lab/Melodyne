@@ -4,220 +4,204 @@ import { useState } from 'react'
 
 const APK_DOWNLOAD = 'https://github.com/stonecaper1-lab/Melodyne/releases/latest/download/melodyne.apk'
 const REPOSITORY = 'https://github.com/stonecaper1-lab/Melodyne'
+const GITHUB_ISSUES = `${REPOSITORY}/issues`
 
-const tracks = [
-  { title: 'Midnight City', artist: 'M83', album: 'Hurry Up, We’re Dreaming', time: '04:03', bitrate: '320' },
-  { title: 'Nightcall', artist: 'Kavinsky', album: 'OutRun', time: '04:18', bitrate: '320' },
-  { title: 'A Real Hero', artist: 'College & Electric Youth', album: 'Drive OST', time: '04:27', bitrate: '256' },
-  { title: 'Under Your Spell', artist: 'Desire', album: 'II', time: '03:34', bitrate: '320' },
-  { title: 'The Bay', artist: 'Metronomy', album: 'The English Riviera', time: '03:52', bitrate: '256' },
+type Skin = 'liquid' | 'cassette' | 'amp' | 'receiver'
+
+const skins: { id: Skin; name: string; detail: string }[] = [
+  { id: 'liquid', name: 'Liquid glass', detail: 'Soft light, album-art color' },
+  { id: 'cassette', name: 'Cassette', detail: 'A little analog nostalgia' },
+  { id: 'amp', name: 'Classic Amp', detail: 'Warm meters, tactile knobs' },
+  { id: 'receiver', name: 'Receiver', detail: 'Cool tuner, hi-fi hardware' },
 ]
 
-const equalizer = [18, 32, 53, 39, 71, 48, 84, 58, 41, 76, 49, 66, 32, 57, 79, 45, 62, 36, 72, 48, 83, 55, 39, 69, 47, 78, 54, 34, 63, 44, 73, 51, 86, 59, 38, 67, 46, 75, 53, 31]
-const bands = ['60', '170', '310', '600', '1K', '3K', '6K']
-
-const featureGroups = [
+const features = [
   {
     number: '01',
-    eyebrow: 'SHAPE THE SOUND',
-    title: 'Your ears, your curve.',
-    description: 'Fine-tune the signal when you want to. Or step aside and let it through untouched.',
-    features: [
-      ['Seven-band equalizer', 'Shape seven frequency bands with built-in presets or drag out a custom curve of your own.'],
-      ['Audiophile Mode', 'Bypass Melodyne’s EQ, loudness shaping, stereo width and crossfade for a cleaner output path.'],
-      ['Loudness tools', 'Optional track normalization helps even out jumps; gentle mode only turns louder songs down.'],
-      ['Gapless + crossfade', 'Keep compatible tracks seamless, or blend between songs with an adjustable 1–12 second fade.'],
-      ['Signal-chain inspector', 'See what is shaping your output and why Audiophile Mode is or is not bit-transparent.'],
-      ['Car & Bluetooth tuning', 'Use the car profile, adjust stereo width and find practical Bluetooth guidance in Settings.'],
-    ],
+    title: 'Audiophile Mode',
+    detail: 'Follow the path from source and decoder through Android output. Vina calls out when the system or Bluetooth can resample or re-encode the signal.',
+    mark: 'SOURCE → OUTPUT',
   },
   {
     number: '02',
-    eyebrow: 'FIND YOUR NEXT SONG',
-    title: 'Follow the feeling.',
-    description: 'Start with a song, an artist, a genre, a mood—or just see where listening takes you.',
-    features: [
-      ['Search that gets around', 'Look up songs, artists, genres and more across Melodyne’s built-in music catalog.'],
-      ['Moods & charts', 'Explore mood-based mixes, regional top tens and trending tracks. Last.fm adds richer tags.'],
-      ['A little déjà vu', 'Pick up where you left off with recent plays, On repeat and “Because you listened” rows.'],
-      ['Artist, album & genre pages', 'Follow credits and tags from a track into related artists, albums, composers and genres.'],
-      ['Infinite play', 'When the queue runs low, let similar recommendations keep the listening session moving.'],
-      ['Lyrics & queue', 'Open time-synced lyrics when available, inspect the queue and jump straight to any song.'],
-    ],
+    title: 'Bitrate that moves',
+    detail: 'Read live bitrate from the audio frames as they play—not just a track’s headline number. Variable-bitrate streams can show their changing rate.',
+    mark: 'FRAME BY FRAME',
   },
   {
     number: '03',
-    eyebrow: 'MAKE IT YOUR MIX',
-    title: 'A playlist with a point of view.',
-    description: 'Save your own collections, keep the useful smart ones, or tell AI Mix what the moment sounds like.',
-    features: [
-      ['AI Mix', 'Describe a mood or moment and make a 10, 20 or 30-song playlist. Play it or save it to your library.'],
-      ['Quick Mix', 'Build a mix without configuring an AI provider. Bring your own OpenAI-compatible provider for prompt-based mixes.'],
-      ['Your provider, your key', 'Connect a provider such as OpenRouter or Groq. The key stays on your phone and prompts go to that provider.'],
-      ['Playlists that stay yours', 'Create, rename, reorder and edit playlists; shuffle them or save a smart playlist as your own.'],
-      ['Import & export', 'Move your Melodyne playlist library in or out as a JSON file.'],
-      ['Smart playlists', 'Let listening history and track length shape useful collections automatically.'],
-    ],
+    title: 'Music with context',
+    detail: 'Optional Last.fm enrichment brings tags, listener counts, scrobbles, recommendations, “On repeat” and “Because you listened to…”.',
+    mark: 'LAST.FM, OPTIONAL',
   },
   {
     number: '04',
-    eyebrow: 'THE DETAILS THAT MATTER',
-    title: 'A player that stays personal.',
-    description: 'Keep the practical stuff close, the account stuff optional, and the interface yours.',
-    features: [
-      ['Live bitrate & quality', 'See live and average bitrate as a stream plays, with playback quality and recent signal details.'],
-      ['Last.fm, if you want it', 'Bring your own API key to sign in, scrobble plays, and unlock richer tags, moods and personalized rows.'],
-      ['Skins & Liquid glow', 'Choose a player skin, sample color from album art and turn the soft ambient glow on or off.'],
-      ['Now Playing widget', 'Pin playback controls to your Android home screen and get back to the current song quickly.'],
-      ['In-app updates', 'Check for releases, download from inside the app and let Android handle installation. Optional background update notifications keep you posted.'],
-      ['Bring your own music source', 'Use Melodyne’s built-in catalog or point it to your own compatible HTTPS music server.'],
-      ['Crash details & welcome tour', 'Copy or clear the last crash report, or replay the welcome tour from Settings.'],
-      ['No sign-up, ads or analytics', 'Melodyne is free to use, with no trackers, ads, analytics or account required. Browse the source and build it yourself.'],
-    ],
+    title: 'Frugal Mode',
+    detail: 'When you need to stretch data or battery, lower stream quality, artwork size and buffering without losing your place in the music.',
+    mark: 'DATA · BATTERY · BUFFER',
   },
 ]
 
-const quickFacts = [
-  ['7 bands', 'tone shaping'],
-  ['∞ play', 'keep it going'],
-  ['0 ads', 'no account'],
-  ['Android', 'built for it'],
-]
-
 export default function Home() {
-  const [playing, setPlaying] = useState(true)
-  const [activeTrack, setActiveTrack] = useState(0)
-  const [volume, setVolume] = useState(72)
-  const track = tracks[activeTrack]
-
-  function changeTrack(direction: number) {
-    setActiveTrack((current) => (current + direction + tracks.length) % tracks.length)
-  }
+  const [skin, setSkin] = useState<Skin>('liquid')
 
   return (
-    <main className="desktop" id="top">
-      <header className="topbar">
-        <a className="wordmark" href="#top" aria-label="Melodyne home"><span className="wordmark-icon" aria-hidden="true">m</span> melodyne<span className="wordmark-period">.</span></a>
-        <nav className="topbar-nav" aria-label="Main navigation">
-          <a href="#features">FEATURES</a>
-          <a href="#about">ABOUT</a>
-          <a className="source-link" href={REPOSITORY} target="_blank" rel="noreferrer">SOURCE <span aria-hidden="true">↗</span></a>
+    <main className="vina-site" id="top">
+      <header className="site-header">
+        <a className="brand" href="#top" aria-label="Vina home">
+          <span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span>
+          <span>vina<span className="brand-period">.</span></span>
+        </a>
+        <nav className="main-nav" aria-label="Main navigation">
+          <a href="#sound">The sound</a>
+          <a href="#skins">Skins</a>
+          <a href={REPOSITORY} target="_blank" rel="noreferrer">Open source <span aria-hidden="true">↗</span></a>
+          <a className="nav-download" href={APK_DOWNLOAD}>Get Vina <span aria-hidden="true">↓</span></a>
         </nav>
       </header>
 
-      <section className="intro" aria-labelledby="intro-title">
-        <p className="intro-kicker"><span className="status-light" /> YOUR MUSIC. YOUR RULES.</p>
-        <h1 id="intro-title">Press play.<br /><span>Go somewhere.</span></h1>
-        <p className="intro-copy">An Android music player for the long way home. Tune the sound, follow a mood, or let the song be. No ads, no accounts, just the good stuff.</p>
-        <div className="intro-actions">
-          <a className="download-button" href={APK_DOWNLOAD} aria-label="Download the latest Melodyne Android APK directly">DOWNLOAD THE ANDROID APK <span aria-hidden="true">↓</span></a>
-          <span className="download-note">DIRECT APK · LATEST RELEASE</span>
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="hero-copy">
+          <p className="eyebrow"><span className="live-dot" /> AN ANDROID MUSIC PLAYER IN PROGRESS</p>
+          <h1 id="hero-title"><span className="title-icon" aria-hidden="true">🎧</span> Vina<span className="title-stop">.</span><br /><span className="hero-second-line">Hear the whole story.</span></h1>
+          <p className="hero-description">A music player for people who care what happens between the source and their ears. Clear signal details, unexpected discoveries, and a player that can dress up like your favorite hi-fi.</p>
+          <div className="hero-actions">
+            <a className="primary-button" href={APK_DOWNLOAD}>Download the Android APK <span aria-hidden="true">↓</span></a>
+            <a className="text-link" href={REPOSITORY} target="_blank" rel="noreferrer">Explore the source <span aria-hidden="true">↗</span></a>
+          </div>
+          <p className="hero-note"><span>ANDROID</span><span className="note-divider" /> <span>FREE TO USE</span><span className="note-divider" /> <span>STILL GROWING</span></p>
+        </div>
+
+        <div className="player-stage" aria-label="Vina player skin preview">
+          <div className="stage-orbit stage-orbit-one" aria-hidden="true" />
+          <div className="stage-orbit stage-orbit-two" aria-hidden="true" />
+          <section className={`player-glass skin-${skin}`} aria-labelledby="player-preview-title">
+            <div className="player-topline">
+              <span><i className="player-status-dot" /> VINA / NOW PLAYING</span>
+              <span className="player-top-right">DEVICE PREVIEW <span aria-hidden="true">···</span></span>
+            </div>
+            <div className="album-art" aria-label="Decorative abstract album artwork" role="img">
+              <div className="art-sun" />
+              <div className="art-ring art-ring-one" />
+              <div className="art-ring art-ring-two" />
+              <div className="art-landscape" />
+              <div className="art-grain" />
+              <span className="art-caption">AFTER<br />THE GLOW</span>
+              <div className="skin-object" aria-hidden="true"><i /><i /><i /></div>
+            </div>
+            <div className="track-details">
+              <div><p className="track-label">A GOOD PLACE TO START</p><h2 id="player-preview-title">The Night We Met</h2><p className="track-artist">Lord Huron <span>·</span> Strange Trails</p></div>
+              <button className="heart-button" type="button" aria-label="Save preview track">♡</button>
+            </div>
+            <div className="waveform" aria-label="Illustrative audio waveform preview" role="img">
+              {Array.from({ length: 54 }, (_, index) => <i key={index} className={index < 24 ? 'wave-played' : ''} style={{ height: `${18 + ((index * 37 + 11) % 68)}%` }} />)}
+            </div>
+            <div className="player-time"><span>02:14</span><span>−02:03</span></div>
+            <div className="player-controls" aria-label="Illustrative playback controls">
+              <button type="button" aria-label="Previous track">|◀</button>
+              <button className="play-button" type="button" aria-label="Play preview">▶</button>
+              <button type="button" aria-label="Next track">▶|</button>
+              <span className="control-spacer" />
+              <span className="quality-pill"><i /> LOSSLESS</span>
+            </div>
+            <div className="live-readout">
+              <div><span className="readout-label">LIVE BITRATE</span><strong>194.7 <small>kb/s</small></strong></div>
+              <div className="readout-meter" aria-hidden="true">{Array.from({ length: 17 }, (_, index) => <i key={index} style={{ height: `${22 + ((index * 29 + 9) % 70)}%` }} />)}</div>
+              <div className="readout-format"><span>FLAC</span><span>44.1 kHz</span></div>
+            </div>
+            <div className="skin-selector" aria-label="Choose a player skin">
+              {skins.map((item) => <button key={item.id} type="button" className={skin === item.id ? 'skin-choice is-active' : 'skin-choice'} onClick={() => setSkin(item.id)} aria-pressed={skin === item.id}>
+                <span className={`skin-swatch swatch-${item.id}`} aria-hidden="true"><i /></span><span>{item.name}</span>
+              </button>)}
+            </div>
+          </section>
+          <div className="floating-note note-a"><span className="note-wave" aria-hidden="true">⌁</span><span>the sound, explained</span></div>
+          <div className="floating-note note-b"><span className="note-spectrum" aria-hidden="true"><i /><i /><i /><i /><i /></span><span>live frame data</span></div>
         </div>
       </section>
 
-      <section className="winamp" aria-label="Melodyne player interface preview">
-        <div className="titlebar">
-          <div className="titlebar-brand"><span className="mini-spectrum" aria-hidden="true"><i /><i /><i /><i /></span> MELODYNE PLAYER <span className="version">2.0</span></div>
-          <div className="window-controls" aria-hidden="true"><span /><span /><span /></div>
+      <section className="sound-section" id="sound" aria-labelledby="sound-title">
+        <div className="section-heading">
+          <p className="eyebrow">MORE THAN A NUMBER ON A BOX</p>
+          <h2 id="sound-title">An honest audio chain.<br /><span>No magic words.</span></h2>
+          <p>Audio quality is a journey through hardware and software. Vina shows the route—and the places Android or Bluetooth might change it.</p>
         </div>
-        <div className="player-screen">
-          <div className="now-playing-line"><span>PLAYER PREVIEW</span><span className="stereo-badge">STEREO</span></div>
-          <div className="lcd-row">
-            <div className="lcd-time" aria-label={`${track.time} track duration`}>{playing ? '02:14' : '00:00'}</div>
-            <div className="lcd-track"><strong>{track.title}</strong><span>{track.artist} — {track.album}</span></div>
-            <div className="lcd-format"><strong>{track.bitrate}</strong><span>KBPS</span></div>
+        <div className="signal-panel">
+          <div className="signal-top"><span>THE SIGNAL PATH</span><span><i className="live-dot" /> TRANSPARENCY ON</span></div>
+          <div className="signal-chain">
+            <div className="signal-node"><span className="node-icon">01</span><strong>Source</strong><small>Stream / file</small></div>
+            <span className="signal-connector" aria-hidden="true"><i /></span>
+            <div className="signal-node"><span className="node-icon">02</span><strong>Decode</strong><small>Codec / frames</small></div>
+            <span className="signal-connector" aria-hidden="true"><i /></span>
+            <div className="signal-node"><span className="node-icon">03</span><strong>Android</strong><small>System mixer</small></div>
+            <span className="signal-connector signal-warning" aria-label="Possible format conversion"><i /></span>
+            <div className="signal-node signal-output"><span className="node-icon">04</span><strong>Your output</strong><small>Wired / Bluetooth</small></div>
           </div>
-          <div className={`spectrum ${playing ? 'is-playing' : ''}`} aria-label={playing ? 'Decorative audio visualizer active' : 'Decorative audio visualizer paused'} role="img">
-            {equalizer.map((height, index) => <i key={index} style={{ '--bar-height': `${height}%`, '--bar-delay': `${(index % 11) * -0.13}s` } as React.CSSProperties} />)}
-          </div>
-          <div className="progress-line"><span>02:14</span><div className="progress-track" aria-label="Decorative track progress"><i /></div><span>{track.time}</span></div>
-        </div>
-        <div className="transport">
-          <div className="transport-buttons">
-            <button className="tiny-control" aria-label="Previous preview track" onClick={() => changeTrack(-1)}>◀|</button>
-            <button className="transport-button" aria-label={playing ? 'Pause preview' : 'Play preview'} onClick={() => setPlaying(!playing)}>{playing ? 'Ⅱ' : '▶'}</button>
-            <button className="tiny-control" aria-label="Next preview track" onClick={() => changeTrack(1)}>|▶</button>
-            <a className="tiny-control eject" href={APK_DOWNLOAD} aria-label="Download the latest Android release">⏏</a>
-          </div>
-          <label className="volume-control"><span aria-hidden="true">VOL</span><input aria-label="Preview volume display" type="range" min="0" max="100" value={volume} onChange={(event) => setVolume(Number(event.target.value))} style={{ '--range-progress': `${volume}%` } as React.CSSProperties} /></label>
-        </div>
-        <div className="equalizer-panel">
-          <div className="panel-label"><span><b className="panel-led" /> EQUALIZER PREVIEW</span><span className="eq-preset">7-BAND <strong>EQ</strong></span></div>
-          <div className="eq-sliders" aria-label="Seven-band equalizer visual preview">
-            {bands.map((band, index) => <div className="eq-band" key={band}><div className="eq-track"><i style={{ bottom: `${[54, 68, 47, 76, 60, 44, 65][index]}%` }} /></div><span>{band}</span></div>)}
-          </div>
-        </div>
-        <div className="playlist">
-          <div className="playlist-heading"><span>EXAMPLE PLAYLIST</span><span>{String(tracks.length).padStart(2, '0')} TRACKS · 20:14</span></div>
-          <div className="playlist-columns"><span>#</span><span>TITLE / ARTIST</span><span>TIME</span></div>
-          <ol className="track-list" aria-label="Example playlist preview">
-            {tracks.map((item, index) => <li key={item.title} className={activeTrack === index ? 'selected' : ''}>
-              <button className="playlist-track" onClick={() => { setActiveTrack(index); setPlaying(true) }} aria-current={activeTrack === index ? 'true' : undefined}>
-                <span className="track-number">{activeTrack === index && playing ? <span className="playing-mark" aria-label="Selected">▶</span> : String(index + 1).padStart(2, '0')}</span>
-                <span className="track-meta"><strong>{item.title}</strong><small>{item.artist} <i>·</i> {item.album}</small></span>
-                <span className="track-duration">{item.time}</span>
-              </button>
-            </li>)}
-          </ol>
-          <div className="playlist-footer"><span>♫ &nbsp; MELODYNE PLAYER PREVIEW</span><span>EQ <b>7-BAND</b> &nbsp; MIX <b>YOUR OWN</b></span></div>
-        </div>
-        <div className="window-status"><span><i /> READY TO ROAM</span><span>ANDROID <b>·</b> FREE SOFTWARE</span></div>
-      </section>
-
-      <section className="quick-facts" aria-label="Melodyne at a glance">
-        {quickFacts.map(([value, label]) => <div className="quick-fact" key={value}><strong>{value}</strong><span>{label}</span></div>)}
-      </section>
-
-      <section className="features-intro" id="features" aria-labelledby="features-title">
-        <div>
-          <span className="section-index">THE WHOLE LISTENING SESSION</span>
-          <h2 id="features-title">More in the music.<br /><span>Less in your way.</span></h2>
-        </div>
-        <p>Explore what Melodyne can actually do, from the signal chain to the last song in the queue. The interface above is a visual preview; the full experience lives in the Android app.</p>
-      </section>
-
-      <div className="feature-groups">
-        {featureGroups.map((group) => <section className="feature-group" key={group.number} aria-labelledby={`group-${group.number}`}>
-          <div className="feature-heading">
-            <span className="section-index">{group.number} / {group.eyebrow}</span>
-            <h3 id={`group-${group.number}`}>{group.title}</h3>
-            <p>{group.description}</p>
-          </div>
-          <div className="feature-grid">
-            {group.features.map(([title, description], index) => <article className="feature-card" key={title}>
-              <span className="feature-index">{group.number}.{String(index + 1).padStart(2, '0')}</span>
-              <h4>{title}</h4>
-              <p>{description}</p>
-            </article>)}
-          </div>
-        </section>)}
-      </div>
-
-      <section className="download-panel" id="download" aria-labelledby="download-title">
-        <div className="download-copy">
-          <span className="section-index">TAKE THE MUSIC WITH YOU</span>
-          <h2 id="download-title">Ready when<br />you are.</h2>
-          <p>Get the latest Melodyne release for Android. The APK downloads directly from GitHub Releases—no store detour.</p>
-          <a className="download-button" href={APK_DOWNLOAD} aria-label="Download the latest Melodyne Android APK directly">DOWNLOAD LATEST APK <span aria-hidden="true">↓</span></a>
-        </div>
-        <div className="download-details">
-          <span className="download-led"><i /> RELEASE FILE</span>
-          <strong>melodyne.apk</strong>
-          <code>{APK_DOWNLOAD}</code>
-          <a href={REPOSITORY + '/releases'} target="_blank" rel="noreferrer">View release notes and older builds <span aria-hidden="true">↗</span></a>
+          <p className="signal-footnote"><span className="warning-mark">!</span> System mixing can resample. Bluetooth can re-encode. Vina shows what it can observe, not a guarantee of bit-perfect output.</p>
         </div>
       </section>
 
-      <section className="honesty-panel" id="about" aria-labelledby="honesty-title">
-        <div><span className="section-index">A NOTE FROM THE DEVELOPER</span><h2 id="honesty-title">Honest about<br />the edges.</h2></div>
-        <div className="honesty-copy">
-          <p>Melodyne is free software with no sign-up, advertisements, trackers or analytics. Optional AI Mix and Last.fm features use services and keys you choose to configure.</p>
-          <p><strong>Not supported yet:</strong> playing music files stored locally on your phone. Melodyne currently plays from its built-in online catalog. Android may also ask you to approve APK installation from your browser the first time.</p>
-          <a href={REPOSITORY} target="_blank" rel="noreferrer">EXPLORE THE SOURCE CODE <span aria-hidden="true">↗</span></a>
+      <section className="feature-section" aria-labelledby="features-title">
+        <div className="section-heading feature-heading">
+          <p className="eyebrow">A FEW THINGS THAT MAKE IT DIFFERENT</p>
+          <h2 id="features-title">Made for listening.<br /><span>And the curious bits.</span></h2>
+        </div>
+        <div className="feature-grid">
+          {features.map((feature) => <article className="feature-card" key={feature.number}>
+            <div className="feature-card-top"><span>{feature.number}</span><span className="feature-mark">{feature.mark}</span></div>
+            <h3>{feature.title}</h3>
+            <p>{feature.detail}</p>
+            <span className="card-glow" aria-hidden="true" />
+          </article>)}
         </div>
       </section>
 
-      <footer className="footer"><span>MELODYNE / FREE SOFTWARE</span><a href={APK_DOWNLOAD}>GET THE ANDROID APK ↓</a></footer>
+      <section className="skins-section" id="skins" aria-labelledby="skins-title">
+        <div className="skins-copy">
+          <p className="eyebrow">DRESS FOR THE LISTENING ROOM</p>
+          <h2 id="skins-title">Liquid glass.<br /><span>Or a little hi-fi history.</span></h2>
+          <p>Let album colors spill into a soft glass interface, or swap the look for a favorite piece of gear. Tap a skin above to try the player preview.</p>
+        </div>
+        <div className="skin-collection" aria-label="Available player skins">
+          <article className="skin-card skin-card-liquid"><span className="skin-card-index">01 / MODERN</span><div className="skin-art glass-art" aria-hidden="true"><i /><i /><i /></div><h3>Liquid glass</h3><p>Album-art color, soft light, airy surfaces.</p></article>
+          <article className="skin-card skin-card-cassette"><span className="skin-card-index">02 / ANALOG</span><div className="skin-art cassette-art" aria-hidden="true"><i /><i /><i /></div><h3>Cassette</h3><p>Warm tape-deck nostalgia for your pocket.</p></article>
+          <article className="skin-card skin-card-amp"><span className="skin-card-index">03 / CLASSIC</span><div className="skin-art amp-art" aria-hidden="true"><i /><i /><i /></div><h3>Classic Amp</h3><p>Brushed metal, warm meters, tactile knobs.</p></article>
+          <article className="skin-card skin-card-receiver"><span className="skin-card-index">04 / TUNED IN</span><div className="skin-art receiver-art" aria-hidden="true"><i /><i /><i /></div><h3>Receiver</h3><p>Cool tuner glass with a hi-fi hardware feel.</p></article>
+        </div>
+      </section>
+
+      <section className="discovery-band" aria-labelledby="discovery-title">
+        <div className="discovery-orb" aria-hidden="true"><span>ON<br />REPEAT</span><i /><i /><i /></div>
+        <div className="discovery-copy"><p className="eyebrow">A LITTLE MUSIC CONTEXT</p><h2 id="discovery-title">Find the thread<br />that leads to more.</h2><p>Last.fm is optional. Connect it when you want listening history, tags and listener counts to help shape recommendations like “Because you listened to…” and “On repeat.”</p><div className="tag-row"><span>LISTENER COUNTS</span><span>ARTIST TAGS</span><span>PERSONALIZED ROWS</span></div></div>
+        <div className="discovery-list" aria-label="Example recommendation rows"><span className="list-eyebrow">AROUND YOUR LISTENING</span><div className="recommendation"><span className="rec-art rec-art-one">01</span><span><small>BECAUSE YOU LISTENED TO</small><strong>Slowdive</strong></span><span className="rec-arrow">↗</span></div><div className="recommendation"><span className="rec-art rec-art-two">02</span><span><small>ON REPEAT</small><strong>Your recent favorites</strong></span><span className="rec-arrow">↗</span></div><div className="recommendation"><span className="rec-art rec-art-three">03</span><span><small>TAGGED FOR THE MOMENT</small><strong>Dream pop · 1990s</strong></span><span className="rec-arrow">↗</span></div></div>
+      </section>
+
+      <section className="frugal-band" aria-labelledby="frugal-title">
+        <div className="frugal-copy"><p className="eyebrow">WHEN YOU’RE AWAY FROM WI-FI</p><h2 id="frugal-title">Frugal Mode.<br /><span>More miles per megabyte.</span></h2><p>Dial down stream quality, artwork size and buffering to save mobile data and battery. The details matter here, too.</p></div>
+        <div className="frugal-visual" aria-label="Frugal Mode savings preview">
+          <div className="frugal-top"><span>FRUGAL MODE</span><span className="toggle-pill"><i /> ON</span></div>
+          <div className="savings-readout"><strong>LESS</strong><span>data in<br />the background</span><div className="savings-bars" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div></div>
+          <div className="frugal-settings"><span><i /> Stream quality <b>Reduced</b></span><span><i /> Artwork size <b>Compact</b></span><span><i /> Buffering <b>Lean</b></span></div>
+          <p className="preview-caption">FEATURE PREVIEW · CONTROLLED IN THE APP</p>
+        </div>
+      </section>
+
+      <section className="more-section" aria-labelledby="more-title">
+        <div className="more-heading"><p className="eyebrow">THE REST OF THE LISTENING SESSION</p><h2 id="more-title">The little details<br /><span>that make a player yours.</span></h2><p>The signal chain is one side of Vina. The rest is built for daily listening, curious detours and the settings you like to keep close.</p></div>
+        <div className="more-grid">
+          <article className="more-card"><span className="more-number">01 / PLAYBACK</span><h3>Tune it to your ears.</h3><ul><li>Seven-band equalizer with presets and a custom curve</li><li>Gentle loudness normalization and Audiophile Mode</li><li>Gapless playback, adjustable crossfade and a car profile</li><li>Queue controls, timed lyrics and playback details</li></ul></article>
+          <article className="more-card"><span className="more-number">02 / DISCOVERY + MIXES</span><h3>Follow the next thread.</h3><ul><li>Search the catalog; explore artists, albums, genres and moods</li><li>Regional charts, Infinite Play and recommendations</li><li>Create and edit playlists; import or export them as JSON</li><li>Quick Mix or prompt-led AI Mix in 10, 20 or 30 songs</li></ul></article>
+          <article className="more-card"><span className="more-number">03 / YOUR SETUP</span><h3>Keep the useful things.</h3><ul><li>Optional compatible HTTPS music source</li><li>Last.fm and AI provider connections are opt-in</li><li>Android home-screen widget and player skins</li><li>In-app updates, update notifications and crash-report tools</li></ul></article>
+        </div>
+      </section>
+
+      <section className="download-section" id="download" aria-labelledby="download-title">
+        <div className="download-orbit" aria-hidden="true"><i /><i /><i /></div>
+        <div className="download-copy"><p className="eyebrow">AN ANDROID PLAYER, STILL GROWING</p><h2 id="download-title">Come listen.<br /><span>Tell me what you think.</span></h2><p>Vina is a work in progress. Download the latest APK, explore the source, or share feedback with the project.</p><div className="download-actions"><a className="primary-button" href={APK_DOWNLOAD}>Download Vina for Android <span aria-hidden="true">↓</span></a><a className="text-link" href={GITHUB_ISSUES} target="_blank" rel="noreferrer">Share feedback <span aria-hidden="true">↗</span></a></div><p className="apk-note">Direct APK from GitHub Releases. Android may ask you to approve installation from your browser.</p></div>
+        <aside className="release-card" aria-label="Android download details"><span className="release-label"><i className="live-dot" /> LATEST ANDROID BUILD</span><span className="release-file">melodyne.apk</span><a href={APK_DOWNLOAD} className="release-link">Download directly <span aria-hidden="true">↗</span></a><a href={`${REPOSITORY}/releases`} className="release-secondary" target="_blank" rel="noreferrer">Release history</a></aside>
+      </section>
+
+      <footer className="site-footer"><a className="footer-brand" href="#top">vina<span>.</span></a><span>Music, with the signal chain in view.</span><div><a href={REPOSITORY} target="_blank" rel="noreferrer">GitHub ↗</a><a href={APK_DOWNLOAD}>Android APK ↓</a></div></footer>
     </main>
   )
 }

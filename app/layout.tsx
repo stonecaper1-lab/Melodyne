@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Melodyne — Android music player, your music your rules',
-  description: 'Explore Melodyne for Android: seven-band EQ, Audiophile Mode, playlists, AI Mix, live bitrate, moods, lyrics, Last.fm and more. Download the latest APK directly.',
+  title: '🎧 Vina: Android music player with an honest audio chain, retro skins, and liquid glass ✨',
+  description: 'Meet Vina, an Android music player with an honest audio chain, live bitrate monitoring, Last.fm discovery, Frugal Mode, liquid glass and retro hi-fi skins.',
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
