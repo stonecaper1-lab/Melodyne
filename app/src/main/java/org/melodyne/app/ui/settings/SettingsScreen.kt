@@ -13,7 +13,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.melodyne.app.data.local.CacheCleaner
+import org.melodyne.app.domain.StorageText
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -275,6 +283,29 @@ fun SettingsScreen() {
                 Pill(if (s.aiTesting) "Testing…" else "Test connection", filled = false) { if (!s.aiTesting) vm.testAi(aiUrl, aiKey, aiModel) }
             }
             s.aiTest?.let { t -> Txt(t, size = 13.sp, color = if (t.startsWith("Connected")) Amoled.Ok else Amoled.Err, maxLines = 4) }
+        }
+
+        Panel("Storage") {
+            var clearOnExit by remember { mutableStateOf(CacheCleaner.enabled()) }
+            var cacheBytes by remember { mutableLongStateOf(-1L) }
+            val storageScope = rememberCoroutineScope()
+            LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { CacheCleaner.sizeBytes(ctx) } }
+            ToggleRow(
+                "Clear cache when Vina closes",
+                "Artwork, buffered audio and Last.fm lookups are deleted when you close the app, so Vina keeps nothing but your library and settings. It never clears while music is playing.",
+                if (clearOnExit) "On" else "Off", clearOnExit,
+            ) { clearOnExit = !clearOnExit; CacheCleaner.setEnabled(clearOnExit) }
+            Txt(
+                if (cacheBytes < 0) "Cache: measuring..." else "Cache right now: " + StorageText.formatBytes(cacheBytes),
+                size = 13.sp, color = Amoled.Muted,
+            )
+            Pill("Clear now") {
+                storageScope.launch {
+                    val freed = withContext(Dispatchers.IO) { CacheCleaner.clear(ctx) }
+                    cacheBytes = withContext(Dispatchers.IO) { CacheCleaner.sizeBytes(ctx) }
+                    Toast.makeText(ctx, "Freed " + StorageText.formatBytes(freed), Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         Panel("Updates") {

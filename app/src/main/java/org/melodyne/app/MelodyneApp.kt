@@ -10,6 +10,7 @@ class MelodyneApp : Application() {
         ServiceLocator.init(this)
         CrashLog.install(ServiceLocator.prefs)
         runCatching { org.melodyne.app.data.update.UpdateScheduler.ensure(this) }
+        runCatching { org.melodyne.app.data.local.CacheCleaner.sweepOnStart(this) }
         org.melodyne.app.player.FrugalMonitor.start(this)
     }
 }

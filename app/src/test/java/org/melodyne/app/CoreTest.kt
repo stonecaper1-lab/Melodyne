@@ -9,6 +9,7 @@ import org.junit.Test
 import org.melodyne.app.ai.AiClient
 import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.domain.Frugal
+import org.melodyne.app.domain.StorageText
 import org.melodyne.app.audio.EQ_BANDS
 import org.melodyne.app.audio.Tpdf
 import org.melodyne.app.player.SleepTimer
@@ -326,5 +327,12 @@ class CoreTest {
         assertFalse(PlaybackState(frugalMode = 2).frugal)
         val f = PlaybackState(frugalMode = 1, normalize = true, crossfade = true, glow = true, skin = "amp")
         assertFalse(f.normalizeEffective); assertFalse(f.crossfadeEffective); assertFalse(f.glowOn); assertEquals("liquid", f.skinEffective)
+    }
+
+    // ---- storage ----
+    @Test fun storageTextParsesApkNamesAndSizes() {
+        assertEquals("0.9.1", StorageText.apkVersion("Vina-v0.9.1.apk")); assertEquals("0.8.0", StorageText.apkVersion("Melodyne-v0.8.0.apk"))
+        assertEquals("1", StorageText.apkVersion("Vina-v1.apk")); assertNull(StorageText.apkVersion("random.apk")); assertNull(StorageText.apkVersion("Vina-v0.9.1.apk.part"))
+        assertEquals("512 B", StorageText.formatBytes(512)); assertEquals("2 KB", StorageText.formatBytes(2048)); assertEquals("12.5 MB", StorageText.formatBytes(13_107_200))
     }
 }

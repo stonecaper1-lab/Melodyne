@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.2
+- Clears its cache when the app closes: artwork, buffered audio, Last.fm lookups and finished update downloads are deleted when you swipe Vina away (never while music is playing). Your library, playlists and settings are untouched. If Android ended the app without warning, the next start tidies up when more than 20 MB was left behind.
+- Settings > Storage: a switch for this (on by default), the current cache size, and a Clear now button.
+- The widget's artwork now lives outside the cache, so clearing never blanks it.
+
 ## v0.9.1
 - Frugal mode (Off / On / Auto): saves mobile data and battery at the cost of sound quality. Streams drop to 48, 96 or 160 kbps, artwork shrinks, the buffer is smaller, and EQ, normalisation, crossfade, skins, glow and Last.fm lookups switch off. Auto turns on over mobile data or Battery Saver. A FRUGAL chip sits on Home.
 - Widget: resizes across a much wider range and has a new tiny layout; remove and re-add it once so the launcher picks up the new sizes.

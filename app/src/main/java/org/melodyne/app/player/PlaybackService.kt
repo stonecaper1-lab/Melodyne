@@ -187,6 +187,7 @@ class PlaybackService : MediaSessionService() {
         session = null
         cache?.release()
         cache = null
+        org.melodyne.app.data.local.CacheCleaner.clearIfEnabled(applicationContext)     // the audio cache is released now, so it is safe to delete
         scope.cancel()
         super.onDestroy()
     }

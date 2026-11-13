@@ -71,7 +71,7 @@ object WidgetUpdater {
         ))
     }
 
-    private fun artFile(ctx: Context) = File(ctx.cacheDir, "widget_art.png")
+    private fun artFile(ctx: Context) = File(ctx.filesDir, "widget_art.png")      // not in the cache, so closing the app keeps the widget looking right
 
     private suspend fun loadArt(ctx: Context, url: String): Pair<Bitmap, Int>? {
         val req = ImageRequest.Builder(ctx).data(url).size(256).allowHardware(false).build()
