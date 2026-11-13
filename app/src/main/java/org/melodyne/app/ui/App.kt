@@ -100,7 +100,7 @@ fun App(conn: PlayerConnection, openSignal: Int = 0) {
         LocalOpenArtist provides { n: String -> artistName = n }, LocalOpenTour provides { tour = true },
         LocalOpenAlbum provides { s: Song -> albumSong = s }, LocalOpenComposer provides { n: String -> composerName = n }) {
         Box(Modifier.fillMaxSize().background(Amoled.Black)) {
-            if (pb.glow) AmbientGlow(accent)
+            if (pb.glowOn) AmbientGlow(accent)
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
                 Box(Modifier.weight(1f)) {
                     when (tab) {

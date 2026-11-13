@@ -13,14 +13,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.melodyne.app.di.ServiceLocator
 
-/** Runs about every six hours, even when Melodyne is closed: looks for a newer release and notifies once per version. */
+/** Runs about every six hours, even when Vina is closed: looks for a newer release and notifies once per version. */
 class UpdateJobService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var running: Job? = null
 
     override fun onStartJob(params: JobParameters): Boolean {
         val updates = ServiceLocator.updates
-        if (!updates.notifyEnabled) return false
+        if (!updates.notifyEnabled || ServiceLocator.playback.state.value.frugal) return false
         running = scope.launch {
             try {
                 val info = updates.newerRelease()

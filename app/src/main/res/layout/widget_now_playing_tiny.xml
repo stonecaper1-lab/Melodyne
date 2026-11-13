@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/widget_bg" android:gravity="center_vertical" android:orientation="horizontal" android:padding="6dp">
+    <ImageView android:id="@+id/w_art" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:contentDescription="@string/app_name" android:scaleType="centerInside" android:src="@drawable/widget_art_placeholder" />
+    <ImageButton android:id="@+id/w_play" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:background="@android:color/transparent" android:contentDescription="Play or pause" android:src="@drawable/ic_widget_play" />
+</LinearLayout>

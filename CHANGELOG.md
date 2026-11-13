@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.1
+- Frugal mode (Off / On / Auto): saves mobile data and battery at the cost of sound quality. Streams drop to 48, 96 or 160 kbps, artwork shrinks, the buffer is smaller, and EQ, normalisation, crossfade, skins, glow and Last.fm lookups switch off. Auto turns on over mobile data or Battery Saver. A FRUGAL chip sits on Home.
+- Widget: resizes across a much wider range and has a new tiny layout; remove and re-add it once so the launcher picks up the new sizes.
+- Fixes the Cassette skin, which crashed while drawing its VU meter scale.
+
+## v0.9.0
+- Melodyne is now Vina. Same app: it installs over your current one, and your playlists, settings and Last.fm login carry across.
+- Sleep timer: 5 to 90 minutes or "end of this song", with a 20-second fade-out, +15 minutes, and a countdown on Now Playing. It works with the app closed.
+- About page now says what it should.
+- Fixes a build error in the skins (a missing import).
+
 ## v0.8.0
 - Widget upgrade: three layouts that switch as you resize it (compact, standard, large), a progress bar and elapsed time that keep moving while you play, an accent colour taken from the artwork, and a Play button that opens the app when nothing is loaded.
 - Classic Amp skin, closer to the 90s originals: titled windows with shade and close, real seven-segment time, a spectrum with falling peak caps, a green-to-red volume bar, an Equalizer window with your seven bands (and the automatic preamp readout), and a playlist window.
@@ -8,7 +19,7 @@
 - Skin buttons give a small haptic click.
 
 ## v0.7.1
-- Update notifications: a background check every few hours tells you when a new release exists. Tap the notification and the download starts by itself; when it finishes, tap "Install". Works with Melodyne closed. Turn it off in Settings > Updates.
+- Update notifications: a background check every few hours tells you when a new release exists. Tap the notification and the download starts by itself; when it finishes, tap "Install". Works with Vina closed. Turn it off in Settings > Updates.
 - Now Playing home-screen widget: artwork, title, artist, live quality label, and working previous, play/pause and next buttons. Tap the art or title to open the player. Add it from Settings or the Widgets menu.
 
 ## v0.7.0

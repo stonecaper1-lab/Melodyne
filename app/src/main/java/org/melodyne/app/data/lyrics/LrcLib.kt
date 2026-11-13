@@ -53,5 +53,5 @@ class LrcLibRepository(private val api: LrcLibApi) {
         return LrcParser.parse(text)
     }
 
-    private companion object { const val UA = "Melodyne/0.5 (Android; free software)" }
+    private companion object { const val UA = "Vina/0.5 (Android; free software)" }
 }

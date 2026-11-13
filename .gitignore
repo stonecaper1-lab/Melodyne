@@ -5,5 +5,3 @@ build/
 *.iml
 RELEASE_NOTES.md
 *.apk
-.vercel
-.env*

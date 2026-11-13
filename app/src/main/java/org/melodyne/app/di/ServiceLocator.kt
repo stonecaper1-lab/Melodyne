@@ -38,6 +38,7 @@ import org.melodyne.app.data.repo.PersonService
 import org.melodyne.app.data.repo.TrackResolver
 import org.melodyne.app.domain.MusicRepository
 import org.melodyne.app.player.BitrateMeter
+import org.melodyne.app.player.SleepTimer
 import org.melodyne.app.player.PlayerConnection
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -87,7 +88,7 @@ object ServiceLocator {
             SessionStore(prefs), BuildConfig.LASTFM_API_KEY, BuildConfig.LASTFM_API_SECRET,
         )
     }
-    val enrichment by lazy { EnrichmentService(lastFmRetrofit.create(LastFmReadApi::class.java), { lastFm.currentKey() }, app.cacheDir, json) }
+    val enrichment by lazy { EnrichmentService(lastFmRetrofit.create(LastFmReadApi::class.java), { lastFm.currentKey() }, app.cacheDir, json) { playback.state.value.frugal } }
     val resolver by lazy { TrackResolver(repo) }
     val moods by lazy { MoodService(enrichment, resolver, repo) }
     val charts by lazy { ChartService(enrichment, resolver, repo, prefs) }
@@ -97,6 +98,7 @@ object ServiceLocator {
     val genres by lazy { GenreService(enrichment, resolver, repo) }
     val infinite by lazy { InfiniteService(repo, enrichment, resolver, library) }
     val bitrate by lazy { BitrateMeter() }
+    val sleep by lazy { SleepTimer() }
     val lrclib by lazy { LrcLibRepository(retrofit("https://lrclib.net/").create(LrcLibApi::class.java)) }
     val updates by lazy { UpdateChecker(http, json, prefs, BuildConfig.VERSION_NAME) }
     val recents by lazy { RecentStore(prefs, json) }

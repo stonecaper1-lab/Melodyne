@@ -54,6 +54,8 @@ class CrossfadeEngine(
         })
     }
 
+    val isFading: Boolean get() = fadeJob?.isActive == true
+
     fun release() { cancel(); tail?.release(); tail = null }
 
     private fun tick() {

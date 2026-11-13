@@ -17,7 +17,7 @@ class UpdateActionReceiver : BroadcastReceiver() {
         NotificationManagerCompat.from(context).cancel(UpdateNotifier.ID_UPDATE)
         val started = UpdateInstaller.download(context, info)
         Toast.makeText(
-            context, if (started) "Downloading Melodyne v${info.version}…" else "Couldn't start the download. Open Settings > Updates.", Toast.LENGTH_LONG,
+            context, if (started) "Downloading Vina v${info.version}…" else "Couldn't start the download. Open Settings > Updates.", Toast.LENGTH_LONG,
         ).show()
     }
 

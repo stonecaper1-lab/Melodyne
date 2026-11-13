@@ -38,8 +38,10 @@ class EnrichmentService(
     private val keyProvider: () -> String,
     private val cacheDir: File,
     private val json: Json,
+    private val isFrugal: () -> Boolean = { false },
 ) {
-    val available: Boolean get() = keyProvider().isNotBlank()
+    /** Last.fm lookups are skipped in Frugal mode to save data. */
+    val available: Boolean get() = keyProvider().isNotBlank() && !isFrugal()
     private val ttlMs = 24L * 3600 * 1000
 
     private fun cacheFile(params: Map<String, String>): File {

@@ -116,7 +116,7 @@ import kotlin.math.abs
 fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> Unit) {
     val skin by ServiceLocator.playback.state.collectAsState()
     val base = LocalAccent.current
-    val accent = if (skin.skin == Skins.LIQUID) base else Skins.accent(skin.skin)
+    val accent = if (skin.skinEffective == Skins.LIQUID) base else Skins.accent(skin.skinEffective)
     CompositionLocalProvider(LocalAccent provides accent) { NowPlayingContent(conn, ps, onClose) }
 }
 
@@ -142,6 +142,8 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
     var showEq by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
+    var showSleep by remember { mutableStateOf(false) }
+    val sleep by ServiceLocator.sleep.state.collectAsState()
     // The clock and the live bitrate live in State holders that only small children read, so the artwork and the rest
     // of the screen never recompose with them (that was the flicker).
     val pos = remember { mutableLongStateOf(0L) }
@@ -153,7 +155,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
         var n = 0
         while (true) {
             pos.longValue = conn.position(); dur.longValue = conn.duration()
-            val series = ps.currentSong?.streamUrl?.let { ServiceLocator.bitrate.peek(it) }
+            val series = (ps.playUrl ?: ps.currentSong?.streamUrl)?.let { ServiceLocator.bitrate.peek(it) }
             val k = series?.kbpsAt(pos.longValue) ?: 0
             if (live.intValue != k) live.intValue = k
             val a = series?.averageKbps() ?: 0
@@ -162,7 +164,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             delay(if (ps.isPlaying) 250 else 1000)
         }
     }
-    BackHandler(enabled = showEq || showLyrics || showMenu || showQueue) { showEq = false; showLyrics = false; showMenu = false; showQueue = false }
+    BackHandler(enabled = showEq || showLyrics || showMenu || showQueue || showSleep) { showEq = false; showLyrics = false; showMenu = false; showQueue = false; showSleep = false }
 
     // Album art "expands" on open, then breathes with play/pause.
     var entered by remember { mutableStateOf(false) }
@@ -176,8 +178,8 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
 
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
         // Liquid backdrop: the artwork, blurred and sunk into the dark. "Liquid glow" off keeps it pure AMOLED black.
-        if (pb.skin != Skins.LIQUID) Box(Modifier.fillMaxSize().background(Skins.background(pb.skin)))
-        if (pb.skin == Skins.LIQUID && pb.glow && ps.artUrl != null) {
+        if (pb.skinEffective != Skins.LIQUID) Box(Modifier.fillMaxSize().background(Skins.background(pb.skinEffective)))
+        if (pb.skinEffective == Skins.LIQUID && pb.glowOn && ps.artUrl != null) {
             AsyncImage(
                 model = ps.artUrl, contentDescription = null, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(64.dp) else Modifier).graphicsLayer { alpha = 0.5f },
@@ -197,7 +199,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
                 Txt("•••", Modifier.clickable { showMenu = true }.padding(horizontal = 10.dp, vertical = 8.dp), size = 14.sp, weight = FontWeight.Black, color = accent)
             }
 
-            if (pb.skin == Skins.LIQUID) {
+            if (pb.skinEffective == Skins.LIQUID) {
             // Artwork with its details right underneath: swipe the art left/right for next/previous, up for lyrics.
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(
@@ -246,6 +248,10 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             }
             }
 
+            if (sleep.active) Txt(
+                "Sleep timer: " + sleep.label(), Modifier.clickable { showSleep = true }.padding(top = 8.dp),
+                size = 12.sp, weight = FontWeight.SemiBold, color = accent,
+            )
             QualityBadge(ps.quality, live, avg, spark, Modifier.padding(top = 10.dp))   // just above the progress bar
             SeekBar(pos, dur, accent, Modifier.padding(top = 12.dp)) { ms -> conn.seekTo(ms); pos.longValue = ms }
             TimeRow(pos, dur)
@@ -265,7 +271,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             }
             } else {
                 SkinBody(
-                    pb.skin,
+                    pb.skinEffective,
                     SkinState(ps, pos, dur, live, avg, pb.audiophile, eqState.shaping && !pb.audiophile, pb.infinite, pb.balance),
                     SkinActions(
                         onToggle = conn::toggle, onNext = conn::next, onPrev = conn::prev,
@@ -278,7 +284,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             }
         }
 
-        if (showEq || showLyrics || showMenu || showQueue) Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showEq = false; showLyrics = false; showMenu = false; showQueue = false })
+        if (showEq || showLyrics || showMenu || showQueue || showSleep) Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showEq = false; showLyrics = false; showMenu = false; showQueue = false; showSleep = false })
 
         // Equalizer sheet
         AnimatedVisibility(
@@ -312,6 +318,36 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
                     Chip("Close", false) { showLyrics = false }
                 }
                 LyricsPanel(lyrics, pos, accent, Modifier.weight(1f).fillMaxWidth())
+            }
+        }
+
+        // Sleep timer
+        AnimatedVisibility(
+            visible = showSleep,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(tween(300)) { it } + fadeIn(tween(200)),
+            exit = slideOutVertically(tween(240)) { it } + fadeOut(tween(160)),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().glassSheet().clickable(enabled = false) {}.navigationBarsPadding().padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Txt("Sleep timer", size = 20.sp, weight = FontWeight.ExtraBold)
+                if (sleep.active) {
+                    Txt(
+                        if (sleep.endOfSong) "Pausing at the end of this song" else "Pausing in ${sleep.label()}, fading out the last 20 seconds",
+                        size = 14.sp, color = accent, maxLines = 2,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (!sleep.endOfSong) Pill("+15 min", filled = false) { ServiceLocator.sleep.extend(15) }
+                        Pill("Cancel timer") { ServiceLocator.sleep.cancel(); showSleep = false }
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 10, 15, 30, 45, 60, 90).forEach { m -> Chip("$m min", false) { ServiceLocator.sleep.start(m); showSleep = false } }
+                    Chip("End of this song", sleep.endOfSong) { ServiceLocator.sleep.startEndOfSong(); showSleep = false }
+                }
+                Pill("Close", filled = false) { showSleep = false }
             }
         }
 
@@ -363,6 +399,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
                 if (song != null && song.album.isNotBlank()) MenuRow("Go to album", song.album) { showMenu = false; openAlbum(song) }
                 composers.forEach { c -> MenuRow("Go to composer", c) { showMenu = false; openComposer(c) } }
                 if (song != null) MenuRow("Add to playlist", null) { showMenu = false; addToPlaylist(song) }
+                MenuRow("Sleep timer", if (sleep.active) sleep.label() else null) { showMenu = false; showSleep = true }
                 MenuRow("Queue", null) { showMenu = false; showQueue = true }
                 MenuRow("Signal chain", if (pb.audiophile) "Audiophile Mode is on" else null) { showMenu = false; openChain() }
                 if (song != null && song.album.isBlank() && composers.isEmpty()) {

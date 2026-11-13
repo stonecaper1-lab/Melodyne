@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.roundToInt
 import org.melodyne.app.BuildConfig
 import org.melodyne.app.di.ServiceLocator
+import org.melodyne.app.domain.Frugal
 import org.melodyne.app.ui.AccentSlider
 import org.melodyne.app.ui.Amoled
 import org.melodyne.app.ui.Chip
@@ -147,6 +148,35 @@ fun SettingsScreen() {
             }
         }
 
+        Panel("Frugal mode") {
+            Txt(
+                "Saves mobile data and battery at the cost of sound quality: lower-bitrate streams, small artwork, a smaller buffer, and no EQ, " +
+                    "normalisation, crossfade, skins, glow or Last.fm lookups.",
+                size = 13.sp, color = Amoled.Muted, maxLines = 6,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip("Off", pb.frugalMode == 0) { playback.setFrugalMode(0) }
+                Chip("On", pb.frugalMode == 1) { playback.setFrugalMode(1) }
+                Chip("Auto", pb.frugalMode == 2) { playback.setFrugalMode(2) }
+            }
+            if (pb.frugalMode == 2) Txt(
+                "Auto turns Frugal on while you're on mobile data or Battery Saver is on. Right now: " +
+                    (if (pb.frugal) "on (${if (pb.batterySaver) "Battery Saver" else "mobile data"})" else "off (Wi-Fi, no Battery Saver)") + ".",
+                size = 12.sp, color = LocalAccent.current, maxLines = 3,
+            )
+            if (pb.frugalMode != 0) {
+                Txt("Stream quality while frugal", size = 14.sp, weight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(48, 96, 160).forEach { k -> Chip("$k kbps", pb.frugalKbps == k) { playback.setFrugalKbps(k) } }
+                }
+                Txt(
+                    "About ${"%.2f".format(Frugal.mbPerMinute(pb.frugalKbps))} MB per minute, against ${"%.1f".format(Frugal.mbPerMinute(320))} MB at 320 kbps. " +
+                        "The smaller buffer takes effect the next time the app starts. Frugal and Audiophile Mode switch each other off.",
+                    size = 12.sp, color = Amoled.Muted, maxLines = 5,
+                )
+            }
+        }
+
         Panel("Appearance") {
             ToggleRow(
                 "Liquid glow", "Soft colour drifting behind the glass, and the blurred artwork on Now Playing. Off gives pure AMOLED black.",
@@ -163,7 +193,7 @@ fun SettingsScreen() {
                     if (mgr.isRequestPinAppWidgetSupported) mgr.requestPinAppWidget(android.content.ComponentName(ctx, org.melodyne.app.widget.NowPlayingWidget::class.java), null, null)
                 }
             }
-            Txt("Or long-press your home screen, choose Widgets, then Melodyne.", size = 12.sp, color = Amoled.Muted, maxLines = 2)
+            Txt("Or long-press your home screen, choose Widgets, then Vina.", size = 12.sp, color = Amoled.Muted, maxLines = 2)
             Pill("Replay the welcome tour", filled = false) { openTour() }
         }
 
@@ -219,7 +249,7 @@ fun SettingsScreen() {
 
         Panel("Custom source (optional)") {
             Txt(
-                "Melodyne has a built-in music source. If you run a compatible server of your own, put its https address here and it will be tried first.",
+                "Vina has a built-in music source. If you run a compatible server of your own, put its https address here and it will be tried first.",
                 size = 13.sp, color = Amoled.Muted, maxLines = 5,
             )
             Field(host, { host = it }, "https://your-instance.example/api", keyboard = KeyboardType.Uri)
@@ -251,7 +281,7 @@ fun SettingsScreen() {
             Txt(s.updateStatus, size = 13.sp, color = if (update != null) Amoled.Ok else Amoled.Muted, maxLines = 3)
             var notifyOn by remember { mutableStateOf(ServiceLocator.updates.notifyEnabled) }
             ToggleRow(
-                "Update notifications", "A check every few hours, even when Melodyne is closed. Tap the notification and the download starts by itself.",
+                "Update notifications", "A check every few hours, even when Vina is closed. Tap the notification and the download starts by itself.",
                 if (notifyOn) "On" else "Off", notifyOn,
             ) {
                 notifyOn = !notifyOn
@@ -260,8 +290,8 @@ fun SettingsScreen() {
             }
             Pill("Check now") { vm.checkUpdates() }
             Txt(
-                "Melodyne looks at the project's latest GitHub release when it opens (at most every 6 hours). Nothing installs by itself; " +
-                    "A new version downloads inside Melodyne and Android then asks you to install it (the first time you will be asked to allow installs from Melodyne). A private repository needs a read-only GitHub token and opens the release page instead.",
+                "Vina looks at the project's latest GitHub release when it opens (at most every 6 hours). Nothing installs by itself; " +
+                    "A new version downloads inside Vina and Android then asks you to install it (the first time you will be asked to allow installs from Vina). A private repository needs a read-only GitHub token and opens the release page instead.",
                 size = 12.sp, color = Amoled.Muted, maxLines = 6,
             )
             Field(updRepo, { updRepo = it }, "owner/repository")
@@ -281,7 +311,7 @@ fun SettingsScreen() {
 
         Panel("About") {
             Txt(
-                "Melodyne ${BuildConfig.VERSION_NAME}",
+                "Vina ${BuildConfig.VERSION_NAME}",
                 Modifier.clickable {
                     val now = System.currentTimeMillis()
                     taps = if (now - lastTap.longValue < 1500) taps + 1 else 1
@@ -291,6 +321,7 @@ fun SettingsScreen() {
                 size = 15.sp, weight = FontWeight.SemiBold,
             )
             Txt("Free software. No trackers, no ads, no analytics, no accounts.", size = 12.sp, color = Amoled.Muted, maxLines = 3)
+            Txt("Stonecaper loves 1509", size = 13.sp, weight = FontWeight.SemiBold, color = LocalAccent.current)
         }
     }
 }

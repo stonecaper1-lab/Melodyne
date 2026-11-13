@@ -55,7 +55,7 @@ class HomeViewModel(
     /** Called every time Home is shown: history rows update as you listen, and a chart older than 30 minutes is fetched again. */
     fun refreshPersonal() {
         _ui.update { it.copy(recents = recents.all(), lastFmReady = enrich.available) }
-        if (chartAt != 0L && System.currentTimeMillis() - chartAt > 30 * 60_000L) viewModelScope.launch { loadChart() }
+        if (chartAt != 0L && System.currentTimeMillis() - chartAt > 30 * 60_000L && !ServiceLocator.playback.state.value.frugal) viewModelScope.launch { loadChart() }
         val stats = library.data.value.stats
         val now = System.currentTimeMillis()
         val repeat = stats.filter { it.plays >= 2 && now - it.last < 30L * 86_400_000L }
