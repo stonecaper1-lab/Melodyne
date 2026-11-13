@@ -16,8 +16,8 @@ android {
         applicationId = "org.melodyne.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "0.9.3"
+        versionCode = 16
+        versionName = "0.9.4"
 
         resourceConfigurations += setOf("en")      // drop library translations
         ndk { abiFilters += "arm64-v8a" }          // one ABI keeps the APK small

@@ -22,9 +22,9 @@ import java.io.IOException
 data class UpdateInfo(val version: String, val notes: String, val pageUrl: String, val apkUrl: String? = null)
 
 /**
- * Looks at the project's latest GitHub release when the app opens (at most every six hours) and tells the UI when a
- * newer version exists. Nothing is installed automatically: "Download" just opens the release in your browser.
- * A private repository needs a read-only GitHub token (Settings > Updates).
+ * Looks at the project's latest public GitHub release (when the app opens, and from a background job) and tells the UI
+ * when a newer version exists. Nothing is installed automatically: the download is started by you, and Android asks
+ * before it installs.
  */
 class UpdateChecker(
     private val http: OkHttpClient,
@@ -37,10 +37,8 @@ class UpdateChecker(
     private val _status = MutableStateFlow("Not checked yet")
     val status: StateFlow<String> = _status.asStateFlow()
 
-    val repo: String get() = prefs.getString("upd_repo", DEFAULT_REPO)?.ifBlank { DEFAULT_REPO } ?: DEFAULT_REPO
-    val token: String get() = prefs.getString("upd_token", "").orEmpty()
-
     init {
+        prefs.edit().remove("upd_repo").remove("upd_token").apply()          // earlier versions let you save a repository and a token; forget both
         val cached = prefs.getString("upd_info", null)?.let { runCatching { json.decodeFromString(UpdateInfo.serializer(), it) }.getOrNull() }
         if (cached != null && isNewer(cached.version, current) && prefs.getString("upd_dismissed", null) != cached.version) {
             _available.value = cached
@@ -65,10 +63,6 @@ class UpdateChecker(
         if (prefs.getString("upd_dismissed", null) == info.version) return null
         _available.value = info
         return info
-    }
-
-    fun saveSource(repo: String, token: String) {
-        prefs.edit().putString("upd_repo", repo.trim().ifBlank { DEFAULT_REPO }).putString("upd_token", token.trim()).putLong("upd_last", 0).apply()
     }
 
     fun dismiss() {
@@ -97,18 +91,19 @@ class UpdateChecker(
         }
     }
 
-    private suspend fun fetch(): UpdateInfo =
-        try { fetchFrom(repo) } catch (e: IOException) { if (repo == DEFAULT_REPO) fetchFrom(LEGACY_REPO) else throw e }
+    /** The project's home, then its old name if GitHub has no release under the new one. */
+    private suspend fun fetch(): UpdateInfo = try { fetchFrom(DEFAULT_REPO) } catch (e: NoRelease) { fetchFrom(LEGACY_REPO) }
+
+    private class NoRelease(message: String) : IOException(message)
 
     private suspend fun fetchFrom(name: String): UpdateInfo = withContext(Dispatchers.IO) {
         val req = Request.Builder().url("https://api.github.com/repos/$name/releases/latest")
             .header("Accept", "application/vnd.github+json")
-            .apply { if (token.isNotBlank()) header("Authorization", "Bearer $token") }
             .build()
         http.newCall(req).execute().use { r ->
             val body = r.body?.string().orEmpty()
             when {
-                r.code == 404 -> throw IOException("no release found. If the repository is private, add a GitHub token below.")
+                r.code == 404 -> throw NoRelease("no release has been published yet")
                 r.code == 403 || r.code == 429 -> throw IOException("GitHub is rate-limiting this phone. Try again later.")
                 !r.isSuccessful -> throw IOException("HTTP ${r.code}")
             }

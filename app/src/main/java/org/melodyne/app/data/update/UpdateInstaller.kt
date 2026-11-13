@@ -11,13 +11,13 @@ import java.io.File
 
 /**
  * Downloads a release with Android's own DownloadManager (it shows progress, survives the app closing, and follows
- * GitHub's redirects) and hands the finished file to the system installer. Works for public repositories; with a
- * private one the notification opens the release page instead, because a download link needs a login.
+ * GitHub's redirects) and hands the finished file to the system installer. If a release has no APK attached, the
+ * notification opens the release page instead.
  */
 object UpdateInstaller {
     private const val APK = "application/vnd.android.package-archive"
 
-    fun canAutoDownload(info: UpdateInfo): Boolean = info.apkUrl != null && ServiceLocator.updates.token.isBlank()
+    fun canAutoDownload(info: UpdateInfo): Boolean = info.apkUrl != null
 
     private fun fileFor(ctx: Context, version: String): File? =
         ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.let { File(it, "Vina-v$version.apk") }

@@ -33,8 +33,6 @@ data class SettingsUi(
     val aiTest: String? = null,
     val aiTesting: Boolean = false,
     val updateStatus: String = "",
-    val updateRepo: String = "",
-    val updateToken: String = "",
 )
 
 class SettingsViewModel(
@@ -49,7 +47,7 @@ class SettingsViewModel(
         SettingsUi(
             lastFm.configured, lastFm.loggedInUser, host = hosts.custom().orEmpty(), ai = aiStore.load(), crash = CrashLog.last(prefs),
             lfKey = lastFm.savedKey, lfSecret = lastFm.savedSecret, lfBuiltIn = lastFm.hasBuiltInKey, lfStatus = lastFm.status.value,
-            updateStatus = updates.status.value, updateRepo = updates.repo, updateToken = updates.token,
+            updateStatus = updates.status.value,
         )
     )
     val ui = _ui.asStateFlow()
@@ -111,11 +109,6 @@ class SettingsViewModel(
     }
 
     fun checkUpdates() { viewModelScope.launch { updates.check(force = true) } }
-
-    fun saveUpdateSource(repo: String, token: String) {
-        updates.saveSource(repo, token)
-        _ui.update { it.copy(updateRepo = updates.repo, updateToken = updates.token, message = "Update source saved.") }
-    }
 
     fun clearCrash() { CrashLog.clear(prefs); _ui.update { it.copy(crash = null) } }
 

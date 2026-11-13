@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.4
+- Settings, reorganised: five groups (Sound, Data & battery, Look & feel, Accounts & sources, App) of collapsible sections, each with a one-line summary of its current state. Playback and Sound quality are split, Car & Bluetooth lives under Sound quality, Frugal mode and Storage are together, the crash log sits inside About (and opens by itself when there is one), and the Appearance, Last.fm, AI and Custom source sections are unchanged inside.
+- Removed the private-repository option (the repository and GitHub token fields). Updates always come from the public release, and any token saved by an earlier version is deleted.
+
 ## v0.9.3
 - The Classic Amp skin now takes the whole screen: the status and navigation bars are hidden while it is showing (swipe from the edge to peek) and come back when you leave, and it draws around a camera notch. The main window sits on top, the Equalizer window opens under it, and the lower window fills the rest of the screen as a scrolling playlist or a big spectrum analyser. EQ, PL, LYR, INF and MENU buttons replace the old top bar; the window's close button leaves the screen.
 
