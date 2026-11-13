@@ -137,6 +137,7 @@ object WidgetUpdater {
         val views = if (Build.VERSION.SDK_INT >= 31) {
             RemoteViews(
                 mapOf(
+                    SizeF(110f, 40f) to build(ctx, s, R.layout.widget_now_playing_tiny),
                     SizeF(180f, 50f) to build(ctx, s, R.layout.widget_now_playing_small),
                     SizeF(250f, 110f) to medium,
                     SizeF(250f, 220f) to build(ctx, s, R.layout.widget_now_playing_large),

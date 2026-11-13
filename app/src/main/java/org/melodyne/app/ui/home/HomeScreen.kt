@@ -111,6 +111,7 @@ fun HomeScreen(conn: PlayerConnection, onOpenSearch: () -> Unit, onOpenAi: () ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     MelodyneMark(ps.isPlaying, accent)
                     Txt("vina", Modifier.padding(start = 8.dp).weight(1f), size = 17.sp, weight = FontWeight.Bold, color = Amoled.Muted)
+                    Chip("FRUGAL", pb.frugalMode != 0, Modifier.padding(end = 6.dp)) { ServiceLocator.playback.setFrugalMode(if (pb.frugalMode == 0) 1 else 0) }
                     Chip("AUDIOPHILE", pb.audiophile) { ServiceLocator.playback.setAudiophile(!pb.audiophile) }
                 }
                 Txt(hello, size = 34.sp, weight = FontWeight.ExtraBold)

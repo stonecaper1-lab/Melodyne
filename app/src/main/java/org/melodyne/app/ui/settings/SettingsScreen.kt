@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.roundToInt
 import org.melodyne.app.BuildConfig
 import org.melodyne.app.di.ServiceLocator
+import org.melodyne.app.domain.Frugal
 import org.melodyne.app.ui.AccentSlider
 import org.melodyne.app.ui.Amoled
 import org.melodyne.app.ui.Chip
@@ -144,6 +145,35 @@ fun SettingsScreen() {
             }
             Pill("Bluetooth volume: Developer options", filled = false) {
                 runCatching { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
+            }
+        }
+
+        Panel("Frugal mode") {
+            Txt(
+                "Saves mobile data and battery at the cost of sound quality: lower-bitrate streams, small artwork, a smaller buffer, and no EQ, " +
+                    "normalisation, crossfade, skins, glow or Last.fm lookups.",
+                size = 13.sp, color = Amoled.Muted, maxLines = 6,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip("Off", pb.frugalMode == 0) { playback.setFrugalMode(0) }
+                Chip("On", pb.frugalMode == 1) { playback.setFrugalMode(1) }
+                Chip("Auto", pb.frugalMode == 2) { playback.setFrugalMode(2) }
+            }
+            if (pb.frugalMode == 2) Txt(
+                "Auto turns Frugal on while you're on mobile data or Battery Saver is on. Right now: " +
+                    (if (pb.frugal) "on (${if (pb.batterySaver) "Battery Saver" else "mobile data"})" else "off (Wi-Fi, no Battery Saver)") + ".",
+                size = 12.sp, color = LocalAccent.current, maxLines = 3,
+            )
+            if (pb.frugalMode != 0) {
+                Txt("Stream quality while frugal", size = 14.sp, weight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(48, 96, 160).forEach { k -> Chip("$k kbps", pb.frugalKbps == k) { playback.setFrugalKbps(k) } }
+                }
+                Txt(
+                    "About ${"%.2f".format(Frugal.mbPerMinute(pb.frugalKbps))} MB per minute, against ${"%.1f".format(Frugal.mbPerMinute(320))} MB at 320 kbps. " +
+                        "The smaller buffer takes effect the next time the app starts. Frugal and Audiophile Mode switch each other off.",
+                    size = 12.sp, color = Amoled.Muted, maxLines = 5,
+                )
             }
         }
 

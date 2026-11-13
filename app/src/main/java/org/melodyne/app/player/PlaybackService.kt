@@ -12,6 +12,7 @@ import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -67,7 +68,8 @@ class PlaybackService : MediaSessionService() {
     private fun applyEq(p: EqProcessor) {
         val e = ServiceLocator.eq.state.value
         val pb = ServiceLocator.playback.state.value
-        p.update(e.gains, e.enabled && !pb.audiophile, if (pb.audiophile) 1f else 1f + pb.width, if (pb.audiophile) 0f else pb.balance)
+        val plain = pb.audiophile || pb.frugal
+        p.update(e.gains, e.enabled && !plain, if (plain) 1f else 1f + pb.width, if (plain) 0f else pb.balance)
     }
 
     private fun newTailPlayer(): ExoPlayer {
@@ -92,7 +94,13 @@ class PlaybackService : MediaSessionService() {
 
         val eqMain = EqProcessor().also { eqProcessors += it }
         val extractors = MeteringExtractorsFactory(DefaultExtractorsFactory(), ServiceLocator.bitrate)
+        // Frugal mode buffers 15 to 30 seconds ahead instead of 50, so skipping wastes less data (applies from the next start).
+        val frugalNow = ServiceLocator.playback.state.value.frugal
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(if (frugalNow) 15_000 else 50_000, if (frugalNow) 30_000 else 50_000, 1_500, 3_000)
+            .build()
         val player = ExoPlayer.Builder(this, renderers(eqMain, loudnessProcessor, MeterProcessor()))
+            .setLoadControl(loadControl)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources, extractors))
             .setAudioAttributes(musicAttrs, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
@@ -128,9 +136,10 @@ class PlaybackService : MediaSessionService() {
         // Audiophile Mode bypasses every processor; otherwise the EQ and normalisation follow the user's settings.
         scope.launch {
             combine(ServiceLocator.eq.state, ServiceLocator.playback.state) { e, p -> e to p }.collect { (e, p) ->
-                val w = if (p.audiophile) 1f else 1f + p.width
-                val bal = if (p.audiophile) 0f else p.balance
-                eqProcessors.forEach { it.update(e.gains, e.enabled && !p.audiophile, w, bal) }
+                val plain = p.audiophile || p.frugal                        // Audiophile and Frugal both leave the audio untouched
+                val w = if (plain) 1f else 1f + p.width
+                val bal = if (plain) 0f else p.balance
+                eqProcessors.forEach { it.update(e.gains, e.enabled && !plain, w, bal) }
                 ServiceLocator.normalizer.enabled = p.normalizeEffective
                 ServiceLocator.normalizer.maxBoostDb = if (p.normGentle) 0.0 else org.melodyne.app.audio.Loudness.MAX_GAIN_DB
                 OutputInspector.applyBitPerfect(this@PlaybackService, p.audiophile)
@@ -161,7 +170,7 @@ class PlaybackService : MediaSessionService() {
         widgetJob?.cancel()
         widgetJob = scope.launch { delay(300); pushWidget(p) }
         widgetTick?.cancel()
-        if (p.isPlaying) widgetTick = scope.launch { while (isActive) { delay(5000); pushWidget(p) } }
+        if (p.isPlaying) widgetTick = scope.launch { while (isActive) { delay(if (ServiceLocator.playback.state.value.frugal) 20_000 else 5_000); pushWidget(p) } }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

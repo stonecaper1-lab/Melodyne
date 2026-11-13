@@ -84,6 +84,7 @@ private val PAGES = listOf(
             "Car & Bluetooth" to "A curve, plus stereo width, for road noise and Bluetooth coding.",
             "Dynamics readout" to "See when a song is a heavily compressed master.",
             "Crossfade" to "Two songs blend, then it's skipped for the last song and repeat-one.",
+            "Frugal mode" to "Saves data and battery at the cost of sound quality. Auto switches it on over mobile data.",
         ),
     ),
     TourPage(

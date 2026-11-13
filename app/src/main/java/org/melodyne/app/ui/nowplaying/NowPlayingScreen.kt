@@ -116,7 +116,7 @@ import kotlin.math.abs
 fun NowPlayingScreen(conn: PlayerConnection, ps: PlayerUiState, onClose: () -> Unit) {
     val skin by ServiceLocator.playback.state.collectAsState()
     val base = LocalAccent.current
-    val accent = if (skin.skin == Skins.LIQUID) base else Skins.accent(skin.skin)
+    val accent = if (skin.skinEffective == Skins.LIQUID) base else Skins.accent(skin.skinEffective)
     CompositionLocalProvider(LocalAccent provides accent) { NowPlayingContent(conn, ps, onClose) }
 }
 
@@ -155,7 +155,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
         var n = 0
         while (true) {
             pos.longValue = conn.position(); dur.longValue = conn.duration()
-            val series = ps.currentSong?.streamUrl?.let { ServiceLocator.bitrate.peek(it) }
+            val series = (ps.playUrl ?: ps.currentSong?.streamUrl)?.let { ServiceLocator.bitrate.peek(it) }
             val k = series?.kbpsAt(pos.longValue) ?: 0
             if (live.intValue != k) live.intValue = k
             val a = series?.averageKbps() ?: 0
@@ -178,8 +178,8 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
 
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
         // Liquid backdrop: the artwork, blurred and sunk into the dark. "Liquid glow" off keeps it pure AMOLED black.
-        if (pb.skin != Skins.LIQUID) Box(Modifier.fillMaxSize().background(Skins.background(pb.skin)))
-        if (pb.skin == Skins.LIQUID && pb.glow && ps.artUrl != null) {
+        if (pb.skinEffective != Skins.LIQUID) Box(Modifier.fillMaxSize().background(Skins.background(pb.skinEffective)))
+        if (pb.skinEffective == Skins.LIQUID && pb.glowOn && ps.artUrl != null) {
             AsyncImage(
                 model = ps.artUrl, contentDescription = null, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(64.dp) else Modifier).graphicsLayer { alpha = 0.5f },
@@ -199,7 +199,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
                 Txt("•••", Modifier.clickable { showMenu = true }.padding(horizontal = 10.dp, vertical = 8.dp), size = 14.sp, weight = FontWeight.Black, color = accent)
             }
 
-            if (pb.skin == Skins.LIQUID) {
+            if (pb.skinEffective == Skins.LIQUID) {
             // Artwork with its details right underneath: swipe the art left/right for next/previous, up for lyrics.
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(
@@ -271,7 +271,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             }
             } else {
                 SkinBody(
-                    pb.skin,
+                    pb.skinEffective,
                     SkinState(ps, pos, dur, live, avg, pb.audiophile, eqState.shaping && !pb.audiophile, pb.infinite, pb.balance),
                     SkinActions(
                         onToggle = conn::toggle, onNext = conn::next, onPrev = conn::prev,

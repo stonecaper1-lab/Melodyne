@@ -8,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.melodyne.app.ai.AiClient
 import org.melodyne.app.audio.CrossfadeCurve
+import org.melodyne.app.domain.Frugal
 import org.melodyne.app.audio.EQ_BANDS
 import org.melodyne.app.audio.Tpdf
 import org.melodyne.app.player.SleepTimer
@@ -307,5 +308,23 @@ class CoreTest {
         assertEquals("12:34", SleepUi(endAt = 1, remainingMs = 754_000).label())
         assertEquals("End of this song", SleepUi(endOfSong = true).label())
         assertTrue(SleepUi(endOfSong = true).active); assertFalse(SleepUi().active)
+    }
+
+    // ---- frugal mode ----
+    @Test fun frugalSwapsOnlyCatalogueBitrateUrls() {
+        assertEquals("https://c.test/a/b_96.mp4", Frugal.streamUrl("https://c.test/a/b_320.mp4", 96))
+        assertEquals("https://c.test/a/b_48.mp4", Frugal.streamUrl("https://c.test/a/b_160.mp4", 48))
+        assertEquals("https://other.test/stream", Frugal.streamUrl("https://other.test/stream", 96))
+        assertEquals(0.72, Frugal.mbPerMinute(96), 1e-9); assertEquals(2.4, Frugal.mbPerMinute(320), 1e-9)
+    }
+
+    @Test fun frugalAutoFollowsMobileDataAndBatterySaver() {
+        assertFalse(PlaybackState(frugalMode = 0, onMetered = true).frugal)
+        assertTrue(PlaybackState(frugalMode = 1).frugal)
+        assertTrue(PlaybackState(frugalMode = 2, onMetered = true).frugal)
+        assertTrue(PlaybackState(frugalMode = 2, batterySaver = true).frugal)
+        assertFalse(PlaybackState(frugalMode = 2).frugal)
+        val f = PlaybackState(frugalMode = 1, normalize = true, crossfade = true, glow = true, skin = "amp")
+        assertFalse(f.normalizeEffective); assertFalse(f.crossfadeEffective); assertFalse(f.glowOn); assertEquals("liquid", f.skinEffective)
     }
 }

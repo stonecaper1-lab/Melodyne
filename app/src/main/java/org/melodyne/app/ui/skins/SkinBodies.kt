@@ -372,7 +372,7 @@ private fun VuMeter(rawLevel: Float, label: String, modifier: Modifier) {
             val cy = size.height * 0.95f
             val len = size.height * 0.80f
             paint.textSize = 9.sp.toPx()
-            val marks = listOf("-20", "-10", "-5", "0", "+3")
+            val marks = listOf("-20", "-10", "-7", "-3", "0", "+3")
             for (k in 0..10) {
                 val a = (-50.0 + k * 10.0) * PI / 180
                 val inner = len * (if (k % 2 == 0) 0.84f else 0.90f)

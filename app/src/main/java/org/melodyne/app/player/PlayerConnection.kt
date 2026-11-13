@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.melodyne.app.di.ServiceLocator
+import org.melodyne.app.domain.Frugal
 import org.melodyne.app.domain.Song
 
 data class PlayerUiState(
@@ -38,6 +39,7 @@ data class PlayerUiState(
     val quality: AudioQuality? = null,
     val error: String? = null,
     val currentSong: Song? = null,
+    val playUrl: String? = null,
 )
 
 /** UI-side handle to the playback service: commands go in, a StateFlow comes out. */
@@ -95,6 +97,7 @@ class PlayerConnection(private val app: Context) {
                 buffering = p.playbackState == Player.STATE_BUFFERING,
                 error = p.playerError?.let { e -> "Stream failed (${e.errorCodeName})" },
                 currentSong = item?.toSong(),
+                playUrl = ex?.getString(Keys.PLAY_URL),
             )
         }
     }
@@ -168,24 +171,32 @@ class PlayerConnection(private val app: Context) {
         )
     }
 
-    private fun toItem(s: Song) = MediaItem.Builder()
-        .setMediaId(s.id)
-        .setUri(s.streamUrl)
-        .setMediaMetadata(
-            MediaMetadata.Builder()
-                .setTitle(s.title).setArtist(s.artist).setAlbumTitle(s.album)
-                .setArtworkUri(s.artUrl?.let { Uri.parse(it) })
-                .setExtras(Bundle().apply {
-                    putInt(Keys.HINT_KBPS, s.streamKbps)
-                    putInt(Keys.DURATION_SEC, s.durationSec)
-                    putBoolean(Keys.HAS_LYRICS, s.hasLyrics)
-                    putString(Keys.STREAM_URL, s.streamUrl)
-                    putString(Keys.THUMB, s.thumbUrl)
-                    putString(Keys.ALBUM_ID, s.albumId)
-                    putString(Keys.COMPOSER, s.composer)
-                })
-                .build()
-        ).build()
+    /** In Frugal mode the stream is swapped for a lower bitrate and the artwork for the small one. The stored song keeps its original links. */
+    private fun toItem(s: Song): MediaItem {
+        val pb = ServiceLocator.playback.state.value
+        val playUrl = if (pb.frugal) Frugal.streamUrl(s.streamUrl, pb.frugalKbps) else s.streamUrl
+        val playKbps = if (pb.frugal && playUrl != s.streamUrl) pb.frugalKbps else s.streamKbps
+        val art = if (pb.frugal) (s.thumbUrl ?: s.artUrl) else s.artUrl
+        return MediaItem.Builder()
+            .setMediaId(s.id)
+            .setUri(playUrl)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(s.title).setArtist(s.artist).setAlbumTitle(s.album)
+                    .setArtworkUri(art?.let { Uri.parse(it) })
+                    .setExtras(Bundle().apply {
+                        putInt(Keys.HINT_KBPS, playKbps)
+                        putInt(Keys.DURATION_SEC, s.durationSec)
+                        putBoolean(Keys.HAS_LYRICS, s.hasLyrics)
+                        putString(Keys.STREAM_URL, s.streamUrl)
+                        putString(Keys.PLAY_URL, playUrl)
+                        putString(Keys.THUMB, s.thumbUrl)
+                        putString(Keys.ALBUM_ID, s.albumId)
+                        putString(Keys.COMPOSER, s.composer)
+                    })
+                    .build()
+            ).build()
+    }
 
     private fun withController(block: (MediaController) -> Unit) {
         val c = controller

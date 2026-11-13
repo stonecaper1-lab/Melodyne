@@ -10,6 +10,8 @@ object Keys {
     const val STREAM_URL = "stream_url"
     const val THUMB = "thumb"
     const val ALBUM_ID = "album_id"
+    /** The URL actually being played (it differs from the stored one in Frugal mode). */
+    const val PLAY_URL = "play_url"
     const val COMPOSER = "composer"
 }
 

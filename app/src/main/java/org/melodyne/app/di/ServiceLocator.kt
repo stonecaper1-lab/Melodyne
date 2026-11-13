@@ -88,7 +88,7 @@ object ServiceLocator {
             SessionStore(prefs), BuildConfig.LASTFM_API_KEY, BuildConfig.LASTFM_API_SECRET,
         )
     }
-    val enrichment by lazy { EnrichmentService(lastFmRetrofit.create(LastFmReadApi::class.java), { lastFm.currentKey() }, app.cacheDir, json) }
+    val enrichment by lazy { EnrichmentService(lastFmRetrofit.create(LastFmReadApi::class.java), { lastFm.currentKey() }, app.cacheDir, json) { playback.state.value.frugal } }
     val resolver by lazy { TrackResolver(repo) }
     val moods by lazy { MoodService(enrichment, resolver, repo) }
     val charts by lazy { ChartService(enrichment, resolver, repo, prefs) }

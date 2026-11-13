@@ -84,7 +84,7 @@ fun ArtistScreen(name: String, conn: PlayerConnection, onClose: () -> Unit) {
     val d = s.detail
 
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
-        if (pb.glow) AmbientGlow(accent)
+        if (pb.glowOn) AmbientGlow(accent)
         LazyColumn(Modifier.fillMaxSize().systemBarsPadding(), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
                 Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {

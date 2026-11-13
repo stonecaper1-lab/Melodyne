@@ -21,10 +21,20 @@ data class PlaybackState(
     val skin: String = "liquid",
     /** Normalisation only turns loud songs down, never boosts quiet ones. */
     val normGentle: Boolean = true,
+    /** 0 = off, 1 = on, 2 = auto (on while on mobile data or Battery Saver). */
+    val frugalMode: Int = 0,
+    val frugalKbps: Int = 96,
+    /** Environment flags kept up to date by FrugalMonitor; not saved. */
+    val onMetered: Boolean = false,
+    val batterySaver: Boolean = false,
 ) {
-    /** Normalisation and crossfade are always off in Audiophile Mode, whatever the saved preference says. */
-    val normalizeEffective: Boolean get() = normalize && !audiophile
-    val crossfadeEffective: Boolean get() = crossfade && !audiophile
+    /** Frugal mode is in force right now. */
+    val frugal: Boolean get() = frugalMode == 1 || (frugalMode == 2 && (onMetered || batterySaver))
+    val glowOn: Boolean get() = glow && !frugal
+    val skinEffective: String get() = if (frugal) "liquid" else skin
+    /** Normalisation and crossfade are always off in Audiophile Mode and in Frugal mode, whatever the saved preference says. */
+    val normalizeEffective: Boolean get() = normalize && !audiophile && !frugal
+    val crossfadeEffective: Boolean get() = crossfade && !audiophile && !frugal
 }
 
 /** Audiophile switch, Audio Tuning, infinite play and appearance, persisted like a profile. */
@@ -42,6 +52,8 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
             balance = prefs.getFloat("balance", 0f).coerceIn(-1f, 1f),
             skin = prefs.getString("skin", "liquid") ?: "liquid",
             normGentle = prefs.getBoolean("norm_gentle", true),
+            frugalMode = prefs.getInt("frugal_mode", 0).coerceIn(0, 2),
+            frugalKbps = prefs.getInt("frugal_kbps", 96),
         )
     )
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -53,10 +65,11 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
             .putBoolean("audiophile", n.audiophile).putBoolean("normalize", n.normalize).putBoolean("crossfade", n.crossfade)
             .putInt("crossfade_sec", n.crossfadeSec).putBoolean("equal_power", n.equalPower)
             .putBoolean("infinite", n.infinite).putBoolean("glow", n.glow)
-            .putFloat("width", n.width).putFloat("balance", n.balance).putString("skin", n.skin).putBoolean("norm_gentle", n.normGentle).apply()
+            .putFloat("width", n.width).putFloat("balance", n.balance).putString("skin", n.skin).putBoolean("norm_gentle", n.normGentle)
+            .putInt("frugal_mode", n.frugalMode).putInt("frugal_kbps", n.frugalKbps).apply()
     }
 
-    fun setAudiophile(on: Boolean) = change { it.copy(audiophile = on) }
+    fun setAudiophile(on: Boolean) = change { it.copy(audiophile = on, frugalMode = if (on) 0 else it.frugalMode) }   // the two are opposites
     fun setNormalize(on: Boolean) = change { it.copy(normalize = on) }
     fun setCrossfade(on: Boolean) = change { it.copy(crossfade = on) }
     fun setCrossfadeSec(s: Int) = change { it.copy(crossfadeSec = s.coerceIn(1, 12)) }
@@ -67,6 +80,11 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
     fun setBalance(b: Float) = change { it.copy(balance = b.coerceIn(-1f, 1f)) }
     fun setSkin(id: String) = change { it.copy(skin = id) }
     fun setNormGentle(on: Boolean) = change { it.copy(normGentle = on) }
+    fun setFrugalMode(mode: Int) = change { it.copy(frugalMode = mode.coerceIn(0, 2), audiophile = if (mode > 0) false else it.audiophile) }
+    fun setFrugalKbps(kbps: Int) = change { it.copy(frugalKbps = kbps) }
+    fun setEnv(metered: Boolean, saver: Boolean) {
+        _state.update { if (it.onMetered == metered && it.batterySaver == saver) it else it.copy(onMetered = metered, batterySaver = saver) }
+    }
 
     /** The welcome tour shows once per install (and once after the update that adds it), then only when asked for. */
     fun wizardSeen(): Boolean = prefs.getBoolean("wizard_seen_v1", false)
@@ -75,7 +93,7 @@ class PlaybackSettings(private val prefs: SharedPreferences) {
     /** One-tap profiles: Normal, Audiophile, Party. */
     fun preset(name: String) = change {
         when (name) {
-            "audiophile" -> it.copy(audiophile = true)
+            "audiophile" -> it.copy(audiophile = true, frugalMode = 0)
             "party" -> it.copy(audiophile = false, normalize = true, crossfade = true, crossfadeSec = 6)
             else -> it.copy(audiophile = false, normalize = true, crossfade = false)
         }

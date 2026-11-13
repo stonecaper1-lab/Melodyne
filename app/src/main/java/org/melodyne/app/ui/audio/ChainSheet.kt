@@ -58,7 +58,7 @@ fun ChainSheet(onClose: () -> Unit) {
         while (true) {
             val name = if (eq.presetId == CUSTOM_ID) "Custom" else EqPresets.byId(eq.presetId).name
             chain = OutputInspector.chain(ctx, ps.quality, pb, eq, name)
-            val series = ps.currentSong?.streamUrl?.let { ServiceLocator.bitrate.peek(it) }
+            val series = (ps.playUrl ?: ps.currentSong?.streamUrl)?.let { ServiceLocator.bitrate.peek(it) }
             val posMs = ServiceLocator.player.position()
             bit = series?.let { Triple(it.kbpsAt(posMs) ?: 0, it.averageKbps() ?: 0, it.recent(posMs)) }
             delay(2000)

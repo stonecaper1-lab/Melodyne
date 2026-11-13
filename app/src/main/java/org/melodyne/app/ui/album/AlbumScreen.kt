@@ -90,7 +90,7 @@ fun AlbumScreen(song: Song, conn: PlayerConnection, onClose: () -> Unit) {
     val accent = LocalAccent.current
     BackHandler(onBack = onClose)
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
-        if (pb.glow) AmbientGlow(accent)
+        if (pb.glowOn) AmbientGlow(accent)
         LazyColumn(Modifier.fillMaxSize().systemBarsPadding(), contentPadding = PaddingValues(bottom = 24.dp)) {
             item { PageHeader("ALBUM", onClose) }
             item {
@@ -127,7 +127,7 @@ fun ComposerScreen(name: String, conn: PlayerConnection, onClose: () -> Unit) {
     val accent = LocalAccent.current
     BackHandler(onBack = onClose)
     Box(Modifier.fillMaxSize().background(Amoled.Black)) {
-        if (pb.glow) AmbientGlow(accent)
+        if (pb.glowOn) AmbientGlow(accent)
         LazyColumn(Modifier.fillMaxSize().systemBarsPadding(), contentPadding = PaddingValues(bottom = 24.dp)) {
             item { PageHeader("COMPOSER", onClose) }
             item {

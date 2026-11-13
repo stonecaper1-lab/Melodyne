@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.1
+- Frugal mode (Off / On / Auto): saves mobile data and battery at the cost of sound quality. Streams drop to 48, 96 or 160 kbps, artwork shrinks, the buffer is smaller, and EQ, normalisation, crossfade, skins, glow and Last.fm lookups switch off. Auto turns on over mobile data or Battery Saver. A FRUGAL chip sits on Home.
+- Widget: resizes across a much wider range and has a new tiny layout; remove and re-add it once so the launcher picks up the new sizes.
+- Fixes the Cassette skin, which crashed while drawing its VU meter scale.
+
 ## v0.9.0
 - Melodyne is now Vina. Same app: it installs over your current one, and your playlists, settings and Last.fm login carry across.
 - Sleep timer: 5 to 90 minutes or "end of this song", with a 20-second fade-out, +15 minutes, and a countdown on Now Playing. It works with the app closed.

@@ -20,7 +20,7 @@ class UpdateJobService : JobService() {
 
     override fun onStartJob(params: JobParameters): Boolean {
         val updates = ServiceLocator.updates
-        if (!updates.notifyEnabled) return false
+        if (!updates.notifyEnabled || ServiceLocator.playback.state.value.frugal) return false
         running = scope.launch {
             try {
                 val info = updates.newerRelease()
