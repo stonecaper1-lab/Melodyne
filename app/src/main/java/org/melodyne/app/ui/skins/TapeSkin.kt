@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -45,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -52,6 +54,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PointMode
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -67,22 +71,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.ui.G
 import org.melodyne.app.ui.Glyph
 import org.melodyne.app.ui.Txt
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.min
 import kotlin.math.sin
+import kotlin.random.Random
 
 private const val CASSETTE_ASPECT = 1.587f           // a real cassette is 102 x 64 mm
 private val MONO_T = FontFamily.Monospace
 private val INK = Color(0xFF1B1C1F)
+private val GLYPH = Color(0xFF7D8189)
+
+/** How much the machine has been used: 0 mint, 1 used, 2 well worn. Chosen in Settings > Appearance. */
+const val TAPE_WEAR_PREF = "tape_wear"
 
 /**
- * A black-and-silver pocket cassette recorder, full screen: a pulsing speaker grille, a smoked-glass door with a real
- * cassette inside (reels turn at the right relative speeds, the tape moves from one spool to the other with the song),
- * a brushed-silver strip, silk-screened labels and a row of piano keys. Hold REVIEW or CUE to wind, long-press EJECT to leave.
+ * A black-and-silver pocket cassette recorder, full screen, with the marks of a machine that has been used. A grille
+ * whose holes breathe with the bass, a smoked-glass door with a cassette behind it (reels turn at the right relative
+ * speeds, tape moves from spool to spool with the song), a brushed-silver strip, silk-screened labels, and piano keys.
+ * Hold REVIEW or CUE to wind, drag the door to seek, long-press EJECT to leave.
  */
 @Composable
 internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
@@ -91,6 +103,7 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
     val playing = st.ps.isPlaying
     val loaded = st.ps.hasItem
     val density = LocalDensity.current
+    val wear = remember { ServiceLocator.prefs.getInt(TAPE_WEAR_PREF, 1).coerceIn(0, 2) }
 
     val progress = if (st.dur.longValue > 0) (st.pos.longValue.toFloat() / st.dur.longValue).coerceIn(0f, 1f) else 0f
     var dragFrac by remember { mutableStateOf<Float?>(null) }
@@ -130,20 +143,36 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
         if (loaded) insert.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow))
     }
 
-    Box(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF1B1B1E), Color(0xFF0B0B0D))))) {
+    Box(
+        modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF1B1B1E), Color(0xFF0B0B0D))))
+            .drawWithCache {
+                val scuffs = bodyScuffs(size.width, size.height, wear, density)
+                onDrawWithContent {
+                    drawContent()
+                    // the plastic edge catching the light, and the scuffs a pocket recorder collects at its corners
+                    drawRoundRect(Color(0x26FFFFFF), Offset(1.5.dp.toPx(), 1.5.dp.toPx()), Size(size.width - 3.dp.toPx(), size.height - 3.dp.toPx()), CornerRadius(14.dp.toPx()), style = Stroke(1.dp.toPx()))
+                    scuffs.draw(this)
+                }
+            },
+    ) {
         Column(
-            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 6.dp),
+            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
         ) {
             // ---------------------------------------------------------------- speaker grille
-            Canvas(Modifier.fillMaxWidth().weight(0.44f)) {
-                val f = levels.value
-                drawGrille(((f.bands[0] + f.bands[1] + f.bands[2]) / 3f).coerceIn(0f, 1f))
-            }
+            Box(
+                Modifier.fillMaxWidth().weight(0.46f).drawWithCache {
+                    val grille = Grille(size, density, wear)
+                    onDrawWithContent {
+                        val f = levels.value
+                        grille.draw(this, ((f.bands[0] + f.bands[1] + f.bands[2]) / 3f).coerceIn(0f, 1f))
+                    }
+                },
+            )
             Spacer(Modifier.height(6.dp))
 
             // ---------------------------------------------------------------- cassette door
             BoxWithConstraints(
-                Modifier.fillMaxWidth().weight(0.30f).clip(RoundedCornerShape(5.dp)).background(Color(0xFF09090B))
+                Modifier.fillMaxWidth().weight(0.29f).clip(RoundedCornerShape(5.dp)).background(Color(0xFF09090B))
                     .border(1.dp, Color(0xFF2C2D31), RoundedCornerShape(5.dp))
                     .pointerInput(Unit) {
                         // turning the tape by hand: drag along the door to seek
@@ -159,8 +188,9 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                         }
                     },
             ) {
-                val topPad = 26.dp
-                val cassW = minOf(maxWidth * 0.86f, (maxHeight - topPad - 8.dp) * CASSETTE_ASPECT)
+                // The cassette leaves a margin on both sides so the machine's own parts show, as in the photo.
+                val topPad = 28.dp
+                val cassW = minOf(maxWidth * 0.78f, (maxHeight - topPad - 10.dp) * CASSETTE_ASPECT)
                 val cassH = cassW / CASSETTE_ASPECT
                 val cassX = (maxWidth - cassW) / 2
                 val cassY = topPad + (maxHeight - topPad - cassH) / 2
@@ -168,13 +198,11 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
 
                 Canvas(Modifier.fillMaxSize()) {
                     val x = cassX.toPx(); val y = cassY.toPx(); val cw = cassW.toPx(); val ch = cassH.toPx()
-                    drawMechanism(x, y, cw, ch)
+                    drawMechanism(x, y, cw, ch, wear)
                     if (loaded) {
                         translate(top = (1f - insert.value) * ch * 0.7f) {
-                            drawCassette(x, y, cw, ch, rotL.floatValue, rotR.floatValue, shownProgress, spinning)
+                            drawCassette(x, y, cw, ch, rotL.floatValue, rotR.floatValue, shownProgress, spinning, wear)
                         }
-                    } else {
-                        drawInsertArrow(Offset(size.width * 0.5f, size.height * 0.80f), size.width * 0.16f)
                     }
                 }
                 Row(Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -184,13 +212,17 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                     )
                     Txt("AC/BATTERY", Modifier.padding(start = 10.dp), size = 10.sp, color = Color.White.copy(alpha = 0.85f), fontFamily = MONO_T)
                 }
+                val titleSp = with(density) { (cassH * 0.082f).toSp() }
+                val artistSp = with(density) { (cassH * 0.062f).toSp() }
                 if (loaded) {
+                    // The writing sits in its own band on the label, above the reel window, so nothing is drawn over it.
                     Column(
-                        Modifier.offset(cassX + cassW * 0.10f, cassY + cassH * 0.165f).width(cassW * 0.80f)
+                        Modifier.offset(cassX + cassW * 0.085f, cassY + cassH * 0.145f).width(cassW * 0.83f).height(cassH * 0.20f)
                             .graphicsLayer { translationY = (1f - insert.value) * cassHPx * 0.7f },
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
-                        Txt(st.ps.title, size = (cassH.value * 0.085f).sp, color = Color(0xFF243A6B), weight = FontWeight.Bold, fontFamily = FontFamily.Cursive, maxLines = 1)
-                        Txt(st.ps.artist, size = (cassH.value * 0.068f).sp, color = Color(0xFF243A6B), fontFamily = FontFamily.Cursive, maxLines = 1)
+                        Txt(st.ps.title, size = titleSp, color = Color(0xFF1F356B), weight = FontWeight.Bold, fontFamily = FontFamily.Cursive, maxLines = 1)
+                        Txt(st.ps.artist, size = artistSp, color = Color(0xFF2B4380), fontFamily = FontFamily.Cursive, maxLines = 1)
                     }
                 }
                 Txt(
@@ -198,25 +230,41 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                     Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 8.dp).background(Color(0xFF050505)).padding(horizontal = 6.dp, vertical = 2.dp),
                     size = 12.sp, color = Color(0xFFE8E4D8), fontFamily = MONO_T,
                 )
-                // smoked glass: a faint diagonal sheen and the white hairlines at the top and bottom of the door
-                Canvas(Modifier.fillMaxSize()) {
-                    drawRect(Brush.linearGradient(listOf(Color(0x24FFFFFF), Color.Transparent, Color(0x0FFFFFFF)), Offset.Zero, Offset(size.width, size.height)))
-                    drawLine(Color(0xD9FFFFFF), Offset(0f, 2.dp.toPx()), Offset(size.width, 2.dp.toPx()), 1.5.dp.toPx())
-                    drawLine(Color(0xD9FFFFFF), Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 1.5.dp.toPx())
-                }
+                // smoked glass, in front of everything: tint, sheen, the printed arrow, the white hairlines, and the marks of use
+                Box(
+                    Modifier.fillMaxSize().drawWithCache {
+                        val marks = glassMarks(size.width, size.height, wear, density)
+                        onDrawWithContent {
+                            drawRect(Color(0x1F000000))
+                            drawRect(Brush.linearGradient(listOf(Color(0x26FFFFFF), Color.Transparent, Color(0x0FFFFFFF)), Offset.Zero, Offset(size.width, size.height)))
+                            drawInsertArrow(Offset(size.width * 0.5f, size.height * 0.84f), size.width * 0.15f)
+                            drawLine(Color(0xD9FFFFFF), Offset(0f, 2.dp.toPx()), Offset(size.width, 2.dp.toPx()), 1.5.dp.toPx())
+                            drawLine(Color(0xD9FFFFFF), Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 1.5.dp.toPx())
+                            marks.draw(this)
+                        }
+                    },
+                )
             }
 
             // ---------------------------------------------------------------- brushed-silver strip
             Row(
                 Modifier.fillMaxWidth().height(52.dp)
                     .background(Brush.verticalGradient(listOf(Color(0xFFD6D8DB), Color(0xFFA7AAAF), Color(0xFFCBCDD1))))
-                    .drawBehind { var y = 0f; while (y < size.height) { drawLine(Color(0x10000000), Offset(0f, y), Offset(size.width, y), 1f); y += 3f } },
+                    .drawWithCache {
+                        val marks = stripMarks(size.width, size.height, wear, density)
+                        onDrawWithContent {
+                            var y = 0f
+                            while (y < size.height) { drawLine(Color(0x10000000), Offset(0f, y), Offset(size.width, y), 1f); y += 3f }
+                            drawContent()
+                            marks.draw(this)
+                        }
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(Modifier.width(12.dp))
                 Canvas(Modifier.size(22.dp)) {
                     val bw = size.width / 7f
-                    listOf(0.35f to 0f, 0.8f to 1f, 0.55f to 2f, 1f to 3f).forEachIndexed { i, (hgt, _) ->
+                    listOf(0.35f, 0.8f, 0.55f, 1f).forEachIndexed { i, hgt ->
                         drawRoundRect(INK, Offset(i * bw * 1.8f, size.height * (1f - hgt)), Size(bw, size.height * hgt), CornerRadius(bw / 2))
                     }
                 }
@@ -226,50 +274,52 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                 Spacer(Modifier.width(4.dp))
             }
 
-            // ---------------------------------------------------------------- silk-screened labels
+            // ---------------------------------------------------------------- silk-screened labels (the wider first key is PLAY)
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Spacer(Modifier.width(46.dp))
-                KeyLabel("PLAY", Modifier.weight(1f))
+                KeyLabel("▶ PLAY", Modifier.weight(1.5f))
                 KeyLabel("◀◀ REVIEW", Modifier.weight(1f))
                 KeyLabel("CUE ▶▶", Modifier.weight(1f))
                 KeyLabel("■ STOP", Modifier.weight(1f))
-                KeyLabel("EJECT/PAUSE", Modifier.weight(1.25f))
+                KeyLabel("EJECT/PAUSE", Modifier.weight(1.1f))
             }
 
             // ---------------------------------------------------------------- piano keys
             Row(
-                Modifier.fillMaxWidth().weight(0.12f).padding(horizontal = 10.dp).padding(bottom = 4.dp),
+                Modifier.fillMaxWidth().weight(0.12f).heightIn(min = 60.dp).padding(horizontal = 10.dp).padding(bottom = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 VolumeSlide(volume)
-                TapeKey(Modifier.weight(1f), pressed = playing, onTap = { if (!playing) act.onToggle() }) {
+                TapeKey(Modifier.weight(1.5f), pressed = playing, wear = wear, onTap = { if (!playing) act.onToggle() }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.size(18.dp).drawBehind { if (playing) drawCircle(Color(0x66FF6A1A), size.minDimension * 1.15f) }
-                                .clip(RoundedCornerShape(2.dp)).background(if (playing) Color(0xFFFF6A1A) else Color(0xFF6B3515)),
+                            Modifier.size(20.dp).drawBehind { if (playing) drawCircle(Color(0x66FF6A1A), size.minDimension * 1.15f) }
+                                .clip(RoundedCornerShape(2.dp)).background(if (playing) Color(0xFFFF6A1A) else if (wear > 0) Color(0xFFB3501B) else Color(0xFFFF6A1A)),
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Glyph(G.Play, Color(0xFF8D9199), 18.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Glyph(G.Play, GLYPH, 18.dp)
                     }
                 }
                 TapeKey(
-                    Modifier.weight(1f), pressed = false, repeatDir = -1,
+                    Modifier.weight(1f), pressed = false, wear = wear, repeatDir = -1,
                     onRepeat = { d -> act.scrub(st, d); scrubDir = d; scrubAt = System.currentTimeMillis() }, onTap = act.onPrev,
-                ) { DoubleArrow(left = true, color = Color(0xFF8D9199)) }
+                ) { DoubleArrow(left = true, color = GLYPH) }
                 TapeKey(
-                    Modifier.weight(1f), pressed = false, repeatDir = 1,
+                    Modifier.weight(1f), pressed = false, wear = wear, repeatDir = 1,
                     onRepeat = { d -> act.scrub(st, d); scrubDir = d; scrubAt = System.currentTimeMillis() }, onTap = act.onNext,
-                ) { DoubleArrow(left = false, color = Color(0xFF8D9199)) }
-                TapeKey(Modifier.weight(1f), pressed = false, onTap = { act.stop(st) }) { Glyph(G.Stop, Color(0xFF8D9199), 18.dp) }
+                ) { DoubleArrow(left = false, color = GLYPH) }
+                TapeKey(Modifier.weight(1f), pressed = false, wear = wear, onTap = { act.stop(st) }) { Glyph(G.Stop, GLYPH, 18.dp) }
                 // tap = pause or resume, like the real key; long-press ejects the tape, which leaves the screen
                 TapeKey(
-                    Modifier.weight(1.25f), pressed = !playing && loaded, onLongPress = act.onClose,
+                    Modifier.weight(1.1f), pressed = !playing && loaded, wear = wear, onLongPress = act.onClose,
                     onTap = { if (loaded) act.onToggle() },
-                ) { Glyph(G.Pause, Color(0xFF8D9199), 18.dp) }
+                ) { Glyph(G.Pause, GLYPH, 18.dp) }
             }
+            // the base lip of the case
+            Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(5.dp).clip(RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)).background(Color(0xFF121214)))
         }
     }
 }
@@ -309,7 +359,7 @@ private fun DoubleArrow(left: Boolean, color: Color) {
 /** A deck key. It stays pressed down while its function is active; some keys also repeat while held, or react to a long press. */
 @Composable
 private fun TapeKey(
-    modifier: Modifier, pressed: Boolean, repeatDir: Int = 0, onRepeat: (Int) -> Unit = {}, onLongPress: (() -> Unit)? = null,
+    modifier: Modifier, pressed: Boolean, wear: Int = 1, repeatDir: Int = 0, onRepeat: (Int) -> Unit = {}, onLongPress: (() -> Unit)? = null,
     onTap: () -> Unit, content: @Composable BoxScope.() -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -321,6 +371,15 @@ private fun TapeKey(
         modifier.fillMaxHeight().offset(y = if (pressed) 4.dp else 0.dp).clip(RoundedCornerShape(4.dp))
             .background(Brush.verticalGradient(if (pressed) listOf(Color(0xFF0E0E10), Color(0xFF1A1A1D)) else listOf(Color(0xFF2B2C30), Color(0xFF151517))))
             .border(1.dp, Color(0xFF3A3B40), RoundedCornerShape(4.dp))
+            .drawWithCache {
+                val marks = keyMarks(size.width, size.height, wear, density)
+                onDrawWithContent {
+                    drawContent()
+                    // plastic polished by thumbs along the top edge, and dust in the gaps
+                    if (wear > 0) drawRect(Brush.verticalGradient(listOf(Color(if (wear > 1) 0x30FFFFFF else 0x1CFFFFFF), Color.Transparent), 0f, size.height * 0.32f), Offset.Zero, Size(size.width, size.height * 0.32f))
+                    marks.draw(this)
+                }
+            }
             .pointerInput(repeatDir) {
                 detectTapGestures(
                     onPress = {
@@ -364,51 +423,155 @@ private fun VolumeSlide(volume: VolumeControl) {
     }
 }
 
-// ------------------------------------------------------------------ drawing
+// ------------------------------------------------------------------ the marks of use
+// Everything below is generated from a fixed seed, so the same machine shows the same scratches every time.
 
-/** The silver speaker panel: brushed aluminium with a grid of round holes whose size breathes with the bass. */
-private fun DrawScope.drawGrille(bass: Float) {
-    val w = size.width
-    val h = size.height
-    drawRoundRect(Color(0xFF141416), Offset.Zero, size, CornerRadius(14.dp.toPx()))
-    val inset = 10.dp.toPx()
-    val px = inset; val py = inset; val pw = w - 2 * inset; val ph = h - 2 * inset
-    drawRoundRect(
-        Brush.verticalGradient(listOf(Color(0xFFC9CCD1), Color(0xFF9EA2A8), Color(0xFFBFC2C7)), startY = py, endY = py + ph),
-        Offset(px, py), Size(pw, ph), CornerRadius(3.dp.toPx()),
-    )
-    var ly = py
-    while (ly < py + ph) { drawLine(Color(0x12000000), Offset(px, ly), Offset(px + pw, ly), 1f); ly += 3f }
-    val cols = 30
-    val s = pw / cols
-    val rows = (ph / s).toInt()
-    val offX = px + (pw - cols * s) / 2 + s / 2
-    val offY = py + (ph - rows * s) / 2 + s / 2
-    val cx = px + pw / 2
-    val cy = py + ph / 2
-    val maxD = hypot(pw / 2, ph / 2)
-    for (i in 0 until rows) {
-        for (j in 0 until cols) {
-            val x = offX + j * s
-            val y = offY + i * s
-            val d = hypot(x - cx, y - cy) / maxD
-            val r = s * 0.30f * (1f + 0.45f * bass * (1f - d).coerceAtLeast(0f))
-            drawCircle(Color(0x55FFFFFF), r, Offset(x + 0.6f, y + 0.9f))
-            drawCircle(Color(0xFF15161A), r, Offset(x, y))
-        }
+private class MLine(val a: Offset, val b: Offset, val color: Color, val w: Float)
+private class MDot(val c: Offset, val r: Float, val color: Color)
+private class MOval(val topLeft: Offset, val size: Size, val color: Color)
+
+private class Marks(val ovals: List<MOval>, val lines: List<MLine>, val dots: List<MDot>) {
+    fun draw(s: DrawScope) {
+        for (o in ovals) s.drawOval(o.color, o.topLeft, o.size)
+        for (l in lines) s.drawLine(l.color, l.a, l.b, l.w, StrokeCap.Round)
+        for (d in dots) s.drawCircle(d.color, d.r, d.c)
     }
 }
+
+/** Scratches, dust specks and smudges scattered over a [w] x [h] surface. [wear] 1 = used, 2 = well worn. */
+private fun scatter(
+    w: Float, h: Float, wear: Int, seed: Int, density: Float, scratches: Int, dust: Int, smudges: Int,
+    light: Color = Color.White, dark: Color = Color.Black, scratchLen: Float = 0.16f,
+): Marks {
+    if (wear <= 0) return Marks(emptyList(), emptyList(), emptyList())
+    val rnd = Random(seed)
+    val k = if (wear >= 2) 2.2f else 1f
+    val ovals = ArrayList<MOval>(); val lines = ArrayList<MLine>(); val dots = ArrayList<MDot>()
+    repeat((smudges * k).toInt()) {
+        val sw = (0.08f + rnd.nextFloat() * 0.18f) * w
+        val sh = sw * (0.5f + rnd.nextFloat() * 0.6f)
+        ovals += MOval(Offset(rnd.nextFloat() * (w - sw), rnd.nextFloat() * (h - sh)), Size(sw, sh), light.copy(alpha = 0.03f + rnd.nextFloat() * 0.04f))
+    }
+    repeat((scratches * k).toInt()) {
+        val x = rnd.nextFloat() * w
+        val y = rnd.nextFloat() * h
+        val a = rnd.nextFloat() * PI.toFloat()
+        val len = (0.02f + rnd.nextFloat() * scratchLen) * min(w, h)
+        lines += MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), (if (rnd.nextBoolean()) light else dark).copy(alpha = 0.18f + rnd.nextFloat() * 0.4f), (0.5f + rnd.nextFloat()) * density)
+    }
+    repeat((dust * k).toInt()) {
+        dots += MDot(Offset(rnd.nextFloat() * w, rnd.nextFloat() * h), (0.4f + rnd.nextFloat() * 0.9f) * density, light.copy(alpha = 0.10f + rnd.nextFloat() * 0.25f))
+    }
+    return Marks(ovals, lines, dots)
+}
+
+private fun glassMarks(w: Float, h: Float, wear: Int, d: Float): Marks = scatter(w, h, wear, 11, d, scratches = 9, dust = 70, smudges = 5, scratchLen = 0.22f)
+private fun stripMarks(w: Float, h: Float, wear: Int, d: Float): Marks = scatter(w, h, wear, 23, d, scratches = 14, dust = 18, smudges = 4, light = Color.White, dark = Color(0xFF3A3C40), scratchLen = 0.10f)
+private fun keyMarks(w: Float, h: Float, wear: Int, d: Float): Marks = scatter(w, h, wear, 31, d, scratches = 2, dust = 6, smudges = 1, scratchLen = 0.3f)
+
+/** Light scuffs along the edges and corners of the black plastic. */
+private fun bodyScuffs(w: Float, h: Float, wear: Int, d: Float): Marks {
+    if (wear <= 0) return Marks(emptyList(), emptyList(), emptyList())
+    val rnd = Random(47)
+    val lines = ArrayList<MLine>()
+    val n = if (wear >= 2) 46 else 20
+    repeat(n) {
+        val corner = rnd.nextInt(4)
+        val ox = if (corner % 2 == 0) 0f else w
+        val oy = if (corner < 2) 0f else h
+        val x = ox + (if (ox == 0f) 1 else -1) * rnd.nextFloat() * w * 0.16f
+        val y = oy + (if (oy == 0f) 1 else -1) * rnd.nextFloat() * h * 0.05f
+        val a = rnd.nextFloat() * PI.toFloat()
+        val len = (4f + rnd.nextFloat() * 16f) * d
+        lines += MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), Color(0xFF8A8C92).copy(alpha = 0.10f + rnd.nextFloat() * 0.3f), (0.6f + rnd.nextFloat()) * d)
+    }
+    return Marks(emptyList(), lines, emptyList())
+}
+
+// ------------------------------------------------------------------ the speaker grille
+
+/** Holes are precomputed once per size and drawn in three batches (centre, middle, rim) so the cone can "breathe" cheaply. */
+private class Grille(size: Size, density: Float, private val wear: Int) {
+    private val w = size.width
+    private val h = size.height
+    private val inset = 10f * density
+    private val px = inset
+    private val py = inset
+    private val pw = w - 2 * inset
+    private val ph = h - 2 * inset
+    private val cols = 38
+    private val pitch = pw / cols
+    private val rows = (ph / pitch).toInt()
+    private val rings = Array(3) { ArrayList<Offset>() }
+    private val rims = Array(3) { ArrayList<Offset>() }          // the lit lower edge of each hole, computed once
+    private val clogged = ArrayList<Offset>()
+    private val marks: Marks
+
+    init {
+        val offX = px + (pw - cols * pitch) / 2 + pitch / 2
+        val offY = py + (ph - rows * pitch) / 2 + pitch / 2
+        val cx = px + pw / 2
+        val cy = py + ph / 2
+        val maxD = hypot(pw / 2, ph / 2)
+        val rnd = Random(5)
+        for (i in 0 until rows) for (j in 0 until cols) {
+            val p = Offset(offX + j * pitch, offY + i * pitch)
+            val d = hypot(p.x - cx, p.y - cy) / maxD
+            val ring = if (d < 0.33f) 0 else if (d < 0.66f) 1 else 2
+            rings[ring].add(p)
+            rims[ring].add(Offset(p.x + 0.6f, p.y + 0.9f))
+            if (wear > 0 && rnd.nextFloat() < (if (wear > 1) 0.035f else 0.012f)) clogged.add(p)       // a few holes are blocked with lint
+        }
+        // scratches show black on the silver, as in the photo, with a few bright ones
+        marks = scatter(w, h, wear, 3, density, scratches = 12, dust = 50, smudges = 6, light = Color.White, dark = Color(0xFF1B1C1F), scratchLen = 0.30f)
+    }
+
+    fun draw(s: DrawScope, bass: Float) = with(s) {
+        drawRoundRect(Color(0xFF141416), Offset.Zero, Size(w, h), CornerRadius(14.dp.toPx()))
+        drawRoundRect(
+            Brush.verticalGradient(listOf(Color(0xFFC9CCD1), Color(0xFF9EA2A8), Color(0xFFBFC2C7)), startY = py, endY = py + ph),
+            Offset(px, py), Size(pw, ph), CornerRadius(3.dp.toPx()),
+        )
+        if (wear > 0) drawRect(Color(0x14C8A050), Offset(px, py), Size(pw, ph))               // the silver has yellowed a little
+        var ly = py
+        while (ly < py + ph) { drawLine(Color(0x12000000), Offset(px, ly), Offset(px + pw, ly), 1f); ly += 3f }
+        val falloff = floatArrayOf(0.85f, 0.5f, 0.15f)
+        for (r in 0 until 3) {
+            val dia = pitch * 0.60f * (1f + 0.45f * bass * falloff[r])
+            drawPoints(rims[r], PointMode.Points, Color(0x55FFFFFF), dia, StrokeCap.Round)
+            drawPoints(rings[r], PointMode.Points, Color(0xFF15161A), dia, StrokeCap.Round)
+        }
+        if (clogged.isNotEmpty()) drawPoints(clogged, PointMode.Points, Color(0xFF8A8478), pitch * 0.5f, StrokeCap.Round)
+        marks.draw(this)
+        // the bezel edge of the panel
+        drawRoundRect(Color(0x55000000), Offset(px, py), Size(pw, ph), CornerRadius(3.dp.toPx()), style = Stroke(1.dp.toPx()))
+    }
+}
+
+// ------------------------------------------------------------------ the cassette and the machine behind it
 
 private class Reels(val left: Offset, val right: Offset, val maxR: Float, val minR: Float)
 
 private fun reelsFor(x: Float, y: Float, cw: Float, ch: Float): Reels {
-    val ww = cw * 0.56f; val wh = ch * 0.26f; val wx = x + cw * 0.22f; val wy = y + ch * 0.30f
+    val ww = cw * 0.56f; val wh = ch * 0.26f; val wx = x + cw * 0.22f; val wy = y + ch * 0.36f
     return Reels(Offset(wx + ww * 0.26f, wy + wh / 2), Offset(wx + ww * 0.74f, wy + wh / 2), wh * 0.52f, wh * 0.24f)
 }
 
-/** What is behind the cassette: the dark well with the two spindles, and the light plate you can just see in the photo. */
-private fun DrawScope.drawMechanism(x: Float, y: Float, cw: Float, ch: Float) {
-    drawRoundRect(Color(0xFF3A3B3E), Offset(size.width * 0.05f, size.height * 0.60f), Size(size.width * 0.16f, size.height * 0.30f), CornerRadius(3.dp.toPx()))
+/** What is behind the cassette: the dark well, the two spindles, the cream plastic lever, and the cracked light plate from the photo. */
+private fun DrawScope.drawMechanism(x: Float, y: Float, cw: Float, ch: Float, wear: Int) {
+    // light grey plate at the lower left; with wear its edge is chipped
+    val plate = Path().apply {
+        moveTo(size.width * 0.04f, size.height * 0.60f); lineTo(size.width * 0.17f, size.height * 0.60f); lineTo(size.width * 0.17f, size.height * 0.80f)
+        if (wear > 0) { lineTo(size.width * 0.15f, size.height * 0.84f); lineTo(size.width * 0.11f, size.height * 0.81f); lineTo(size.width * 0.09f, size.height * 0.90f) }
+        else lineTo(size.width * 0.17f, size.height * 0.90f)
+        lineTo(size.width * 0.04f, size.height * 0.90f); close()
+    }
+    drawPath(plate, Color(0xFF4A4B4F))
+    // cream plastic lever with its hooks, at the right
+    val lx = size.width * 0.925f
+    drawRoundRect(Color(0xFF9C957F), Offset(lx, size.height * 0.20f), Size(size.width * 0.022f, size.height * 0.52f), CornerRadius(3.dp.toPx()))
+    drawRoundRect(Color(0xFF9C957F), Offset(lx - size.width * 0.02f, size.height * 0.20f), Size(size.width * 0.042f, size.height * 0.05f), CornerRadius(2.dp.toPx()))
+    drawRoundRect(Color(0xFF9C957F), Offset(lx - size.width * 0.02f, size.height * 0.67f), Size(size.width * 0.042f, size.height * 0.05f), CornerRadius(2.dp.toPx()))
     val r = reelsFor(x, y, cw, ch)
     for (c in listOf(r.left, r.right)) {
         drawCircle(Color(0xFF17181A), r.minR * 1.1f, c)
@@ -416,6 +579,7 @@ private fun DrawScope.drawMechanism(x: Float, y: Float, cw: Float, ch: Float) {
     }
 }
 
+/** The outline arrow printed on the glass, as on the real door. */
 private fun DrawScope.drawInsertArrow(c: Offset, w: Float) {
     val h = w * 0.36f
     val p = Path().apply {
@@ -423,21 +587,28 @@ private fun DrawScope.drawInsertArrow(c: Offset, w: Float) {
         lineTo(c.x + w / 2, c.y); lineTo(c.x + w * 0.05f, c.y + h / 2); lineTo(c.x + w * 0.05f, c.y + h * 0.2f)
         lineTo(c.x - w / 2, c.y + h * 0.2f); close()
     }
-    drawPath(p, Color.White.copy(alpha = 0.9f), style = Stroke(1.5.dp.toPx()))
+    drawPath(p, Color.White.copy(alpha = 0.8f), style = Stroke(1.5.dp.toPx()))
 }
 
-/** A cassette seen through the door: label with ruled lines, the reel window, the bottom with heads, rollers and moving tape. */
-private fun DrawScope.drawCassette(x: Float, y: Float, cw: Float, ch: Float, rotL: Float, rotR: Float, p: Float, playing: Boolean) {
+/**
+ * A cassette seen through the door, on the proportions of a real one: the label on top with the coloured stripe and a
+ * band of ruled lines for the writing, then the reel window, then the shell's bottom with heads, rollers and moving tape.
+ */
+private fun DrawScope.drawCassette(x: Float, y: Float, cw: Float, ch: Float, rotL: Float, rotR: Float, p: Float, playing: Boolean, wear: Int) {
     val corner = CornerRadius(ch * 0.06f)
     drawRoundRect(Color(0xFF2A2B2F), Offset(x, y), Size(cw, ch), corner)
     drawRoundRect(Color(0xFF3C3E43), Offset(x, y), Size(cw, ch), corner, style = Stroke(1.5f))
-    // label, with the coloured stripe and ruled lines for the handwriting
-    val lx = x + cw * 0.06f; val ly = y + ch * 0.07f; val lw = cw * 0.88f; val lh = ch * 0.60f
-    drawRoundRect(Color(0xFFE9DFC4), Offset(lx, ly), Size(lw, lh), CornerRadius(ch * 0.03f))
-    drawRect(Color(0xFFD94F3D), Offset(lx, ly), Size(lw, lh * 0.16f))
-    for (k in 0..2) drawLine(Color(0xFFB4C2D8), Offset(lx + lw * 0.04f, ly + lh * (0.40f + k * 0.17f)), Offset(lx + lw * 0.96f, ly + lh * (0.40f + k * 0.17f)), 1f)
+    // label: stripe, writing band (two ruled lines, kept clear of the window), then the reel window
+    val lx = x + cw * 0.05f; val ly = y + ch * 0.06f; val lw = cw * 0.90f; val lh = ch * 0.62f
+    drawRoundRect(if (wear > 0) Color(0xFFE2D6B3) else Color(0xFFEEE4C8), Offset(lx, ly), Size(lw, lh), CornerRadius(ch * 0.03f))
+    drawRect(Color(0xFFD94F3D), Offset(lx, ly), Size(lw, ch * 0.075f))
+    for (yy in listOf(0.235f, 0.325f)) drawLine(Color(0xFFA9B8D2), Offset(lx + lw * 0.03f, y + ch * yy), Offset(lx + lw * 0.97f, y + ch * yy), 1f)
+    if (wear > 0) {
+        drawLine(Color(0x22000000), Offset(lx + lw * 0.62f, ly), Offset(lx + lw * 0.66f, ly + lh), 1f)            // a crease where the label was stuck down
+        if (wear > 1) drawCircle(Color(0x16734A1E), ch * 0.09f, Offset(lx + lw * 0.84f, ly + lh * 0.72f), style = Stroke(ch * 0.012f))   // a cup ring
+    }
     // the reel window: tape packs that grow and shrink with the song's progress
-    val ww = cw * 0.56f; val wh = ch * 0.26f; val wx = x + cw * 0.22f; val wy = y + ch * 0.30f
+    val ww = cw * 0.56f; val wh = ch * 0.26f; val wx = x + cw * 0.22f; val wy = y + ch * 0.36f
     drawRoundRect(Color(0xFF14110F), Offset(wx, wy), Size(ww, wh), CornerRadius(wh / 2))
     val r = reelsFor(x, y, cw, ch)
     val leftR = r.maxR - (r.maxR - r.minR) * p

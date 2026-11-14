@@ -21,7 +21,7 @@ object Skins {
         ),
         SkinSpec(
             "tape", "Cassette",
-            "A black-and-silver pocket cassette recorder, full screen with the status bar hidden. A cassette slides in for every song, the reels turn at the right relative speeds while tape moves from one spool to the other, the speaker grille breathes with the bass, and the piano keys stay down while they are active. Hold review or cue to wind, drag along the door to seek, long-press eject to leave.",
+            "A black-and-silver pocket cassette recorder, full screen with the status bar hidden. A cassette slides in for every song, the reels turn at the right relative speeds while tape moves from one spool to the other, the speaker grille breathes with the bass, and the piano keys stay down while they are active. It carries the marks of use (scratches, dust, smudges, scuffs; set the wear in Settings). Hold review or cue to wind, drag along the door to seek, long-press eject to leave.",
             Color(0xFFFFB347),
         ),
         SkinSpec(

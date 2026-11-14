@@ -20,6 +20,10 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import org.melodyne.app.audio.PlayModes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -144,6 +148,14 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
     var showMenu by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
+    // Which mode is active (Normal, Audiophile or Frugal): a banner when the player opens or the mode changes, and a pill that stays.
+    val modeNoticeOn = remember { ServiceLocator.prefs.getBoolean("mode_notice", true) }
+    var noticeVisible by remember { mutableStateOf(modeNoticeOn) }
+    var noticeTick by remember { mutableIntStateOf(0) }
+    val playMode = PlayModes.of(pb)
+    LaunchedEffect(playMode, noticeTick) {
+        if (modeNoticeOn || noticeTick > 0) { noticeVisible = true; delay(3600); noticeVisible = false }
+    }
     val sleep by ServiceLocator.sleep.state.collectAsState()
     // The clock and the live bitrate live in State holders that only small children read, so the artwork and the rest
     // of the screen never recompose with them (that was the flicker).
@@ -213,6 +225,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             }
 
             if (pb.skinEffective == Skins.LIQUID) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { ModePill(pb) { noticeTick++ } }
             // Artwork with its details right underneath: swipe the art left/right for next/previous, up for lyrics.
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(
@@ -287,6 +300,11 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             }
         }
 
+        ModeNotice(
+            visible = noticeVisible, state = pb, eqShaping = eqState.shaping && !pb.audiophile, onDismiss = { noticeVisible = false },
+            modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(start = 16.dp, end = 16.dp, top = if (Skins.isFullScreen(pb.skinEffective)) 8.dp else 64.dp),
+        )
         if (showEq || showLyrics || showMenu || showQueue || showSleep) Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showEq = false; showLyrics = false; showMenu = false; showQueue = false; showSleep = false })
 
         // Equalizer sheet

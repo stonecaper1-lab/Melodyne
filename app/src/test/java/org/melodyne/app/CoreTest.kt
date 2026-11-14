@@ -11,6 +11,8 @@ import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.domain.Frugal
 import org.melodyne.app.domain.StorageText
 import org.melodyne.app.audio.EQ_BANDS
+import org.melodyne.app.audio.PlayMode
+import org.melodyne.app.audio.PlayModes
 import org.melodyne.app.audio.EQ_LABELS
 import org.melodyne.app.audio.EqImport
 import org.melodyne.app.audio.EqLegacy
@@ -372,5 +374,26 @@ class CoreTest {
         assertEquals("0.9.1", StorageText.apkVersion("Vina-v0.9.1.apk")); assertEquals("0.8.0", StorageText.apkVersion("Melodyne-v0.8.0.apk"))
         assertEquals("1", StorageText.apkVersion("Vina-v1.apk")); assertNull(StorageText.apkVersion("random.apk")); assertNull(StorageText.apkVersion("Vina-v0.9.1.apk.part"))
         assertEquals("512 B", StorageText.formatBytes(512)); assertEquals("2 KB", StorageText.formatBytes(2048)); assertEquals("12.5 MB", StorageText.formatBytes(13_107_200))
+    }
+
+    // ---- playback mode notice ----
+    @Test fun theActiveModeIsNamedCorrectly() {
+        assertEquals(PlayMode.NORMAL, PlayModes.of(PlaybackState()))
+        assertEquals(PlayMode.AUDIOPHILE, PlayModes.of(PlaybackState(audiophile = true)))
+        assertEquals(PlayMode.FRUGAL, PlayModes.of(PlaybackState(frugalMode = 1)))
+        assertEquals(PlayMode.FRUGAL, PlayModes.of(PlaybackState(frugalMode = 2, onMetered = true)))
+        assertEquals(PlayMode.NORMAL, PlayModes.of(PlaybackState(frugalMode = 2)))                       // Auto, but on Wi-Fi: not active
+        assertEquals(PlayMode.FRUGAL, PlayModes.of(PlaybackState(audiophile = true, frugalMode = 1)))    // safety net: Frugal wins
+    }
+
+    @Test fun modeDetailsSayWhatIsHappening() {
+        assertTrue(PlayModes.detail(PlaybackState(frugalMode = 2, batterySaver = true)).startsWith("Auto: Battery Saver is on"))
+        assertTrue(PlayModes.detail(PlaybackState(frugalMode = 2, onMetered = true)).startsWith("Auto: you're on mobile data"))
+        assertTrue(PlayModes.detail(PlaybackState(frugalMode = 1, frugalKbps = 48)).contains("48 kbps"))
+        assertTrue(PlayModes.detail(PlaybackState(audiophile = true)).contains("bypassed"))
+        assertEquals("Standard playback, no effects.", PlayModes.detail(PlaybackState(normalize = false)))
+        val fx = PlayModes.detail(PlaybackState(crossfade = true, crossfadeSec = 8, width = 0.25f), eqShaping = true)
+        assertTrue(fx.contains("EQ") && fx.contains("volume normalised") && fx.contains("crossfade 8 s") && fx.contains("width +25%"))
+        assertEquals("FRUGAL", PlayModes.label(PlayMode.FRUGAL)); assertEquals("Audiophile Mode", PlayModes.title(PlayMode.AUDIOPHILE))
     }
 }

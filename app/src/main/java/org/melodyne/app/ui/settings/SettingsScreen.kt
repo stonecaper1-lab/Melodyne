@@ -94,6 +94,8 @@ fun SettingsScreen() {
     var aiKey by remember(s.ai) { mutableStateOf(s.ai.apiKey) }
     var aiModel by remember(s.ai) { mutableStateOf(s.ai.model) }
     var notifyOn by remember { mutableStateOf(ServiceLocator.updates.notifyEnabled) }
+    var tapeWear by remember { mutableStateOf(ServiceLocator.prefs.getInt(org.melodyne.app.ui.skins.TAPE_WEAR_PREF, 1)) }
+    var modeNotice by remember { mutableStateOf(ServiceLocator.prefs.getBoolean("mode_notice", true)) }
     var clearOnExit by remember { mutableStateOf(CacheCleaner.enabled()) }
     var cacheBytes by remember { mutableLongStateOf(-1L) }
     val storageScope = rememberCoroutineScope()
@@ -277,11 +279,24 @@ fun SettingsScreen() {
                 "Liquid glow", "Soft colour drifting behind the glass, and the blurred artwork on Now Playing. Off gives pure AMOLED black.",
                 if (pb.glow) "On" else "Off", pb.glow,
             ) { playback.setGlow(!pb.glow) }
+            ToggleRow(
+                "Mode notice", "A banner when you open the player or the mode changes, showing whether Normal, Audiophile or Frugal mode is active. The small mode label stays either way.",
+                if (modeNotice) "On" else "Off", modeNotice,
+            ) { modeNotice = !modeNotice; ServiceLocator.prefs.edit().putBoolean("mode_notice", modeNotice).apply() }
             Txt("Player skin", size = 15.sp, weight = FontWeight.SemiBold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Skins.ALL.forEach { sk -> Chip(sk.name, pb.skin == sk.id) { playback.setSkin(sk.id) } }
             }
             Txt(Skins.byId(pb.skin).blurb, size = 12.sp, color = Amoled.Muted, maxLines = 6)
+            if (pb.skin == "tape") {
+                Txt("Cassette wear", size = 14.sp, weight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Mint", "Used", "Well worn").forEachIndexed { i, name ->
+                        Chip(name, tapeWear == i) { tapeWear = i; ServiceLocator.prefs.edit().putInt(org.melodyne.app.ui.skins.TAPE_WEAR_PREF, i).apply() }
+                    }
+                }
+                Txt("Scratches, dust, smudges and scuffs on the machine. Mint is factory-new; Well worn has seen a lot of use.", size = 12.sp, color = Amoled.Muted, maxLines = 3)
+            }
             Pill("Add the Now Playing widget", filled = false) {
                 runCatching {
                     val mgr = ctx.getSystemService(android.appwidget.AppWidgetManager::class.java)

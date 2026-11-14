@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.2
+- Fixes a build error in the equaliser panel (a missing import).
+- Cassette skin, refined against the photo. The song title is no longer covered: the label now has its own writing band above the reel window, with the window and cassette re-proportioned like a real one (the writing used to run into the window, which painted over it).
+- Marks of use: scratches (black on the silver grille, bright on the glass), dust, smudges and fingerprints on the smoked glass, a few grille holes clogged with lint, yellowing silver, scuffs at the corners of the case, thumb-polished keys, a faded record lamp, a chipped plate and a cream plastic lever in the door as in the photo, and a creased, stained label. Choose Mint, Used or Well worn in Settings > Appearance (default Used). The marks are fixed, so the same machine looks the same every time.
+- The grille now has 38 columns of holes like the original, drawn in batches so the bass pulse stays smooth. The outline arrow is printed on the glass and stays visible with a cassette in. The door leaves a margin around the cassette so the machine's own parts show. PLAY is the wider first key, and a base lip finishes the case.
+
+## v0.10.1
+- The player now says which mode is active. A banner slides in from the top when you open Now Playing and whenever the mode changes (including Frugal switching itself on or off in Auto), naming the mode and what it is doing to the sound: Normal lists any active effects, Audiophile says what is bypassed, Frugal says why it is on (switched on, Battery Saver, or mobile data) and the stream quality. It works over every skin, including the full-screen ones.
+- A small mode label (NORMAL, AUDIOPHILE, FRUGAL, or FRUGAL · AUTO) stays under the top bar; tap it to show the banner again. The banner can be switched off in Settings > Look & feel > Appearance.
+
 ## v0.10.0
 - Equaliser rework, after studying how JamesDSP's arbitrary-response equaliser and AutoEQ work. Ten octave bands (31 Hz to 16 kHz) instead of seven; saved custom curves move across automatically.
 - The sliders are replaced by a response curve you drag, drawn over the live spectrum. A solver compensates for neighbouring bands overlapping, so the curve you draw is the curve you get (a slider at +6 dB really gives +6 dB at that frequency). Headroom is measured from the filters that actually run.
