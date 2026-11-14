@@ -11,6 +11,9 @@ import org.melodyne.app.audio.CrossfadeCurve
 import org.melodyne.app.domain.Frugal
 import org.melodyne.app.domain.StorageText
 import org.melodyne.app.audio.EQ_BANDS
+import org.melodyne.app.audio.EQ_LABELS
+import org.melodyne.app.audio.EqImport
+import org.melodyne.app.audio.EqLegacy
 import org.melodyne.app.audio.Tpdf
 import org.melodyne.app.player.SleepTimer
 import org.melodyne.app.player.SleepUi
@@ -104,9 +107,9 @@ class CoreTest {
     }
 
     // ---- equalizer ----
-    @Test fun sevenBandsAndPresetsAreConsistent() {
-        assertEquals(7, EQ_BANDS.size)
-        EqPresets.all.forEach { assertEquals(it.id, 7, it.gains.size) }
+    @Test fun tenBandsAndPresetsAreConsistent() {
+        assertEquals(10, EQ_BANDS.size); assertEquals(10, EQ_LABELS.size)
+        EqPresets.all.forEach { assertEquals(it.id, 10, it.gains.size) }
         assertEquals(EqPresets.all.size, EqPresets.all.map { it.id }.toSet().size)
         assertTrue(EqPresets.byId("flat").gains.all { it == 0f })
         assertEquals("flat", EqPresets.byId("nope").id)
@@ -114,10 +117,45 @@ class CoreTest {
 
     @Test fun filterHitsRequestedGainAndHeadroomMatchesPeak() {
         val fs = 44100.0
-        assertEquals(6.0, EqMath.magnitudeDb(EqMath.design(3, 6f, fs), 1000.0, fs), 0.05)
-        assertEquals(0.0, EqMath.headroomDb(List(7) { 0f }), 0.0)
-        assertEquals(6.0, EqMath.headroomDb(listOf(0f, 0f, 0f, 6f, 0f, 0f, 0f)), 0.15)
-        assertEquals(0.0, EqMath.headroomDb(listOf(-3f, -2f, 0f, 0f, 0f, 0f, -4f)), 0.001)   // cuts need no headroom
+        assertEquals(6.0, EqMath.magnitudeDb(EqMath.design(5, 6f, fs), 1000.0, fs), 0.05)           // band 5 is 1 kHz
+        assertEquals(0.0, EqMath.headroomDb(List(10) { 0f }), 0.0)
+        assertEquals(6.0, EqMath.headroomDb(listOf(0f, 0f, 0f, 0f, 0f, 6f, 0f, 0f, 0f, 0f)), 0.15)
+        assertEquals(0.0, EqMath.headroomDb(listOf(-3f, -2f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, -4f)), 0.001)   // cuts need no headroom
+    }
+
+    @Test fun theCurveYouDrawIsTheCurveYouGet() {
+        val drawn = listOf(6f, 3f, -4f, 5f, -2f, 0f, 7f, -6f, 4f, 2f)           // deliberately bumpy
+        val designed = EqMath.designGains(drawn)
+        val fs = EqMath.UI_RATE
+        for (i in EQ_BANDS.indices) assertEquals("band $i", drawn[i].toDouble(), EqMath.totalDb(designed, EQ_BANDS[i].toDouble(), fs), 0.25)
+        assertTrue(EqMath.designGains(List(10) { 0f }).all { it == 0f })
+        val curve = EqMath.curve(drawn, listOf(1000.0, 4000.0))
+        assertEquals(drawn[5].toDouble(), curve[0], 0.25); assertEquals(drawn[7].toDouble(), curve[1], 0.25)
+    }
+
+    @Test fun oldSevenBandCurvesMoveOntoTenBands() {
+        val old = listOf(0f, 0f, 0f, 6f, 0f, 0f, 0f)                             // +6 dB at 1 kHz
+        val moved = EqLegacy.resample(old)
+        assertEquals(10, moved.size); assertEquals(6f, moved[5], 0.01f)         // 1 kHz is a band in both
+        assertEquals(0f, moved[0], 0.01f); assertEquals(0f, moved[9], 0.01f)
+        assertTrue(moved[4] in 0.5f..5.5f && moved[6] in 0.5f..5.5f)             // the neighbours slope between
+        assertEquals(List(10) { 0f }, EqLegacy.resample(List(7) { 0f }))
+    }
+
+    @Test fun autoEqProfilesImport() {
+        val parametric = "Preamp: -6.2 dB\nFilter 1: ON PK Fc 1000 Hz Gain 6.0 dB Q 1.00\nFilter 2: ON LSC Fc 105 Hz Gain 6.0 dB Q 0.70\nFilter 3: OFF PK Fc 3000 Hz Gain 9.0 dB Q 2.00"
+        val r = EqImport.parse(parametric)!!
+        assertEquals(2, r.count); assertEquals(1, r.skipped); assertEquals("filters", r.kind)
+        assertEquals(6.0, r.gains[5].toDouble() + 0.0, 1.5)                      // the 1 kHz bell lands on the 1 kHz band
+        assertTrue(r.gains[0] > 4f)                                                // the low shelf lifts the lowest bands
+        assertTrue(r.gains[9] < 1f)
+        val oneLine = EqImport.parse("Filter 1: ON PK Fc 1000 Hz Gain 6.0 dB Q 1.00 Filter 2: ON PK Fc 4000 Hz Gain -4.0 dB Q 1.00")!!   // a pasted single line still works
+        assertEquals(2, oneLine.count)
+        val graphic = EqImport.parse("GraphicEQ: 20 0.0; 1000 5.0; 20000 5.0")!!
+        assertEquals(5f, graphic.gains[5], 0.01f); assertEquals("graphic points", graphic.kind)
+        assertTrue(graphic.gains[0] in 0.3f..1.5f)
+        assertNull(EqImport.parse("hello world")); assertNull(EqImport.parse(""))
+        assertTrue(EqImport.parse("GraphicEQ: 20 40; 20000 40")!!.clipped)       // beyond the limit is clamped and flagged
     }
 
     // ---- search de-duplication ----

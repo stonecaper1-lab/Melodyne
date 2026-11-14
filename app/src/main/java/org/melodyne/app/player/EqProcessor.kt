@@ -14,7 +14,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Seven-band parametric EQ plus stereo width and balance, inside the decode path. 16-bit PCM in, double-precision maths,
+ * Ten-band graphic EQ plus stereo width and balance, inside the decode path. 16-bit PCM in, double-precision maths,
  * 16-bit PCM out (TPDF-dithered). Auto-headroom is subtracted so boosts can't clip; widening is level-compensated.
  * When everything is neutral (flat EQ, width 1, balance centred) or switched off, input is copied through untouched.
  */
@@ -84,9 +84,10 @@ class EqProcessor : BaseAudioProcessor() {
         stereoFx = channels == 2 && (abs(w - 1.0) > 0.01 || abs(b) > 0.01f)
         shaping = eqOn || stereoFx
         if (eqOn) {
-            for (i in EQ_BANDS.indices) filters[i] = EqMath.design(i, g[i], rate.toDouble())
-            live = EQ_BANDS.indices.filter { abs(g[it]) >= 0.05f }.toIntArray()
-            preamp = 10.0.pow(-EqMath.headroomDb(g.toList(), rate.toDouble()) / 20.0)
+            val designed = EqMath.designGains(g.toList(), rate.toDouble())          // so the response passes through the drawn curve
+            for (i in EQ_BANDS.indices) filters[i] = EqMath.design(i, designed[i], rate.toDouble())
+            live = EQ_BANDS.indices.filter { abs(designed[it]) >= 0.05f }.toIntArray()
+            preamp = 10.0.pow(-EqMath.headroomDb(designed, rate.toDouble()) / 20.0)
         } else {
             live = IntArray(0)
             preamp = 1.0

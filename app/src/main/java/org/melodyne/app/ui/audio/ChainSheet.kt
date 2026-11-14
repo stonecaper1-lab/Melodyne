@@ -32,8 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import org.melodyne.app.audio.CUSTOM_ID
-import org.melodyne.app.audio.EqPresets
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.player.Chain
 import org.melodyne.app.player.OutputInspector
@@ -56,7 +54,7 @@ fun ChainSheet(onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     LaunchedEffect(ps.quality, pb, eq) {
         while (true) {
-            val name = if (eq.presetId == CUSTOM_ID) "Custom" else EqPresets.byId(eq.presetId).name
+            val name = eq.presetName
             chain = OutputInspector.chain(ctx, ps.quality, pb, eq, name)
             val series = (ps.playUrl ?: ps.currentSong?.streamUrl)?.let { ServiceLocator.bitrate.peek(it) }
             val posMs = ServiceLocator.player.position()

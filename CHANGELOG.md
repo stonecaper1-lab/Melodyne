@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.0
+- Equaliser rework, after studying how JamesDSP's arbitrary-response equaliser and AutoEQ work. Ten octave bands (31 Hz to 16 kHz) instead of seven; saved custom curves move across automatically.
+- The sliders are replaced by a response curve you drag, drawn over the live spectrum. A solver compensates for neighbouring bands overlapping, so the curve you draw is the curve you get (a slider at +6 dB really gives +6 dB at that frequency). Headroom is measured from the filters that actually run.
+- Save your own presets by name (and delete them), reset to flat, and import headphone-correction profiles: copy the text of an AutoEQ ParametricEQ or GraphicEQ file, tap Paste profile, and the curve matches it. Peaking and shelving filters are supported.
+- The Amp skin's Equalizer window and the receiver skin's bass and treble knobs follow the ten bands; the range is now ±12 dB.
+
 ## v0.9.5
 - The Cassette skin is redesigned after a black-and-silver pocket cassette recorder, and takes the whole screen with the status bar hidden. A silver speaker grille whose holes breathe with the bass; a smoked-glass door with a real cassette behind it that slides in for every song; reels that turn at physically correct speeds (the small reel faster than the big one) while the tape moves from one spool to the other with the song's progress; a brushed-silver strip; silk-screened labels over piano keys that stay down while active, with a lamp on PLAY.
 - Hold REVIEW or CUE to wind (the reels spin fast), tap them to skip, drag along the door to seek, tap EJECT/PAUSE to pause, long-press it to eject (leave the screen). A ribbed volume slide sets the phone's real volume. EQ, Lyrics, Queue and Menu sit on the silver strip.

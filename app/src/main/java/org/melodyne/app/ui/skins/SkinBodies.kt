@@ -185,18 +185,17 @@ private fun AmpBody(st: SkinState, act: SkinActions, modifier: Modifier) {
             }
         }
 
-        // The equalizer window: the same seven bands as everywhere else. "Preamp" is the automatic headroom that keeps boosts from clipping.
+        // The equalizer window: the same ten bands as everywhere else. "Preamp" is the automatic headroom that keeps boosts from clipping.
         if (eqWin) AmpWindow("EQUALIZER", onShade = null, onClose = { eqWin = false }) {
             val gains = eq.gains
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 LabelBtn("ON", green, eq.enabled) { ServiceLocator.eq.setEnabled(!eq.enabled) }
-                LabelBtn(if (eq.presetId == org.melodyne.app.audio.CUSTOM_ID) "CUSTOM" else org.melodyne.app.audio.EqPresets.byId(eq.presetId).name.uppercase().take(12), green, false) {
-                    val all = org.melodyne.app.audio.EqPresets.all
-                    val i = all.indexOfFirst { it.id == eq.presetId }
-                    ServiceLocator.eq.setPreset(all[(i + 1) % all.size].id)
+                LabelBtn(eq.presetName.uppercase().take(12), green, false) {
+                    val ids = eq.presetIds
+                    ServiceLocator.eq.setPreset(ids[(ids.indexOf(eq.presetId) + 1) % ids.size])
                 }
                 Spacer(Modifier.weight(1f))
-                Txt("PREAMP -%.1f dB".format(org.melodyne.app.audio.EqMath.headroomDb(gains)), size = 11.sp, color = green, fontFamily = MONO)
+                Txt("PREAMP -%.1f dB".format(org.melodyne.app.audio.EqMath.headroomForTargets(gains)), size = 11.sp, color = green, fontFamily = MONO)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 gains.forEachIndexed { i, g -> AmpBand(org.melodyne.app.audio.EQ_LABELS[i], g, green) { ServiceLocator.eq.setBand(i, it) } }
@@ -311,8 +310,8 @@ private fun DeckBody(st: SkinState, act: SkinActions, modifier: Modifier) {
     val amber = Color(0xFFFFB000)
     val ink = Color(0xFF2B2D31)
     val g = eq.gains
-    val bassDb = (g[0] + g[1]) / 2f
-    val trebleDb = (g[5] + g[6]) / 2f
+    val bassDb = g.first()
+    val trebleDb = g.last()
     val playing = st.ps.isPlaying
     val paint = remember { android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFFFB000.toInt(); typeface = android.graphics.Typeface.MONOSPACE } }
 
@@ -387,7 +386,7 @@ private fun DeckBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                 // knobs: bass and treble really move the EQ; the big one is the phone's volume
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Knob((bassDb + 10f) / 20f, { v -> val db = v * 20f - 10f; ServiceLocator.eq.setBand(0, db); ServiceLocator.eq.setBand(1, db) }, amber, 66.dp, centreDetent = true)
+                        Knob((bassDb + 10f) / 20f, { v -> ServiceLocator.eq.setBass(v * 20f - 10f) }, amber, 66.dp, centreDetent = true)
                         Txt("BASS", size = 10.sp, weight = FontWeight.Bold, color = ink, fontFamily = MONO)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -395,7 +394,7 @@ private fun DeckBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                         Txt("VOLUME", size = 10.sp, weight = FontWeight.Bold, color = ink, fontFamily = MONO)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Knob((trebleDb + 10f) / 20f, { v -> val db = v * 20f - 10f; ServiceLocator.eq.setBand(5, db); ServiceLocator.eq.setBand(6, db) }, amber, 66.dp, centreDetent = true)
+                        Knob((trebleDb + 10f) / 20f, { v -> ServiceLocator.eq.setTreble(v * 20f - 10f) }, amber, 66.dp, centreDetent = true)
                         Txt("TREBLE", size = 10.sp, weight = FontWeight.Bold, color = ink, fontFamily = MONO)
                     }
                 }
@@ -474,10 +473,10 @@ private fun AmpBand(label: String, db: Float, color: Color, onChange: (Float) ->
         val raw = (((h / 2f) - y) / (h / 2f)) * org.melodyne.app.audio.EQ_MAX_DB
         return (raw.coerceIn(-org.melodyne.app.audio.EQ_MAX_DB, org.melodyne.app.audio.EQ_MAX_DB) * 2f).roundToInt() / 2f
     }
-    Column(Modifier.width(34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Column(Modifier.width(30.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Txt(if (kotlin.math.abs(db) < 0.05f) "0" else "%+.0f".format(db), size = 9.sp, color = color, fontFamily = MONO)
         Canvas(
-            Modifier.width(30.dp).height(96.dp)
+            Modifier.width(26.dp).height(96.dp)
                 .pointerInput(Unit) { detectTapGestures { o -> cb(toDb(o.y, size.height)) } }
                 .pointerInput(Unit) { detectVerticalDragGestures { c, _ -> cb(toDb(c.position.y, size.height)) } },
         ) {
