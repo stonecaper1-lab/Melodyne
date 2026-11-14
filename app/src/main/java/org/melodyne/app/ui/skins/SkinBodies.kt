@@ -1,8 +1,5 @@
 package org.melodyne.app.ui.skins
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -31,7 +28,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,11 +41,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.LongState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,8 +54,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -73,14 +65,9 @@ import androidx.compose.ui.unit.sp
 import org.melodyne.app.di.ServiceLocator
 import org.melodyne.app.domain.Song
 import org.melodyne.app.player.PlayerUiState
-import org.melodyne.app.ui.Amoled
 import org.melodyne.app.ui.G
-import org.melodyne.app.ui.Glyph
 import org.melodyne.app.ui.Txt
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.log10
-import kotlin.math.sin
 
 class SkinState(
     val ps: PlayerUiState, val pos: LongState, val dur: LongState, val live: IntState, val avg: IntState,
@@ -125,10 +112,10 @@ private fun Marquee(text: String, color: Color, size: Int, modifier: Modifier = 
     )
 }
 
-private fun SkinActions.scrub(st: SkinState, dir: Int) =
+internal fun SkinActions.scrub(st: SkinState, dir: Int) =
     onSeekTo((st.pos.longValue + dir * 5000L).coerceIn(0L, maxOf(0L, st.dur.longValue)))
 
-private fun SkinActions.stop(st: SkinState) { if (st.ps.isPlaying) onToggle(); onSeekTo(0L) }
+internal fun SkinActions.stop(st: SkinState) { if (st.ps.isPlaying) onToggle(); onSeekTo(0L) }
 
 // ================================================================== Classic Amp
 /**
@@ -312,149 +299,6 @@ private fun AmpWindow(
             Modifier.padding(8.dp).then(if (fill) Modifier.weight(1f) else Modifier),
             verticalArrangement = Arrangement.spacedBy(8.dp), content = content,
         )
-    }
-}
-
-// ================================================================== Cassette deck
-@Composable
-private fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
-    val levels = rememberLevels(st.ps.isPlaying)
-    val amber = Color(0xFFFFB347)
-    val rot = remember { mutableFloatStateOf(0f) }
-    val playing = st.ps.isPlaying
-    LaunchedEffect(playing) {
-        var last = 0L
-        while (true) withFrameNanos { t ->
-            if (last != 0L && playing) rot.floatValue = (rot.floatValue + (t - last) / 1e9f * 150f) % 360f
-            last = t
-        }
-    }
-    var entered by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { entered = true }
-    val slide by animateFloatAsState(if (entered) 0f else 260f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow), label = "insert")   // the tape is "put in"
-
-    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Box(Modifier.fillMaxWidth().height(214.dp).graphicsLayer { translationY = slide; alpha = (1f - slide / 300f).coerceIn(0f, 1f) }) {
-            Canvas(Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
-                drawRoundRect(Color(0xFF2B2420), Offset.Zero, Size(w, h), CornerRadius(18.dp.toPx()))
-                drawRoundRect(Color(0xFFE9DDC2), Offset(10.dp.toPx(), 10.dp.toPx()), Size(w - 20.dp.toPx(), h - 20.dp.toPx()), CornerRadius(12.dp.toPx()))
-                // label with ruled lines
-                val lx = 26.dp.toPx(); val ly = 22.dp.toPx(); val lw = w - 52.dp.toPx(); val lh = 70.dp.toPx()
-                drawRoundRect(Color(0xFFF7F0DC), Offset(lx, ly), Size(lw, lh), CornerRadius(6.dp.toPx()))
-                for (k in 1..3) drawLine(Color(0xFFB9C7DB), Offset(lx + 8.dp.toPx(), ly + k * lh / 4f), Offset(lx + lw - 8.dp.toPx(), ly + k * lh / 4f), 1f)
-                drawRect(Color(0xFFD94F3D), Offset(lx, ly), Size(6.dp.toPx(), lh))                    // the red edge stripe
-                // window with tape-length ticks
-                val wx = w * 0.18f; val wy = h * 0.52f; val ww = w * 0.64f; val wh = h * 0.30f
-                drawRoundRect(Color(0xFF1A1512), Offset(wx, wy), Size(ww, wh), CornerRadius(wh / 2))
-                var tx = wx + wh
-                while (tx < wx + ww - wh) { drawLine(Color(0x33FFFFFF), Offset(tx, wy + 3.dp.toPx()), Offset(tx, wy + 8.dp.toPx()), 1f); tx += 14.dp.toPx() }
-                val p = if (st.dur.longValue > 0) (st.pos.longValue.toFloat() / st.dur.longValue).coerceIn(0f, 1f) else 0f
-                val maxR = wh * 0.47f
-                val minR = wh * 0.22f
-                val left = Offset(wx + wh / 2, wy + wh / 2)
-                val right = Offset(wx + ww - wh / 2, wy + wh / 2)
-                drawCircle(Color(0xFF4A3524), maxR - (maxR - minR) * p, left)           // the tape moves from the left spool to the right as the song plays
-                drawCircle(Color(0xFF4A3524), minR + (maxR - minR) * p, right)
-                for (c in listOf(left, right)) {
-                    drawCircle(Color(0xFFD9D4C7), minR * 0.85f, c)
-                    rotate(rot.floatValue, c) {
-                        for (k in 0 until 6) {
-                            val a = k * PI / 3
-                            drawLine(Color(0xFF2B2420), c, Offset(c.x + minR * 0.8f * cos(a).toFloat(), c.y + minR * 0.8f * sin(a).toFloat()), 2.dp.toPx())
-                        }
-                    }
-                }
-                // four screws
-                for (c in listOf(Offset(20.dp.toPx(), 20.dp.toPx()), Offset(w - 20.dp.toPx(), 20.dp.toPx()), Offset(20.dp.toPx(), h - 20.dp.toPx()), Offset(w - 20.dp.toPx(), h - 20.dp.toPx()))) {
-                    drawCircle(Color(0xFFB9B3A3), 5.dp.toPx(), c)
-                    rotate(35f, c) { drawLine(Color(0xFF5C5648), Offset(c.x - 4.dp.toPx(), c.y), Offset(c.x + 4.dp.toPx(), c.y), 1.5.dp.toPx()) }
-                }
-            }
-            Column(Modifier.padding(start = 40.dp, end = 90.dp, top = 22.dp)) {
-                Txt(st.ps.title, size = 16.sp, color = Color(0xFF2B3A67), weight = FontWeight.Bold, fontFamily = FontFamily.Cursive)
-                Txt(st.ps.artist, size = 13.sp, color = Color(0xFF2B3A67), fontFamily = FontFamily.Cursive)
-            }
-            Txt("C-90", Modifier.align(Alignment.TopEnd).padding(top = 28.dp, end = 34.dp).background(Color(0xFFD94F3D)).padding(horizontal = 6.dp, vertical = 2.dp),
-                size = 11.sp, weight = FontWeight.Black, color = Color.White, fontFamily = MONO)
-            Txt("A", Modifier.align(Alignment.TopStart).padding(top = 12.dp, start = 14.dp), size = 11.sp, weight = FontWeight.Black, color = Color(0xFF2B2420), fontFamily = MONO)
-            Txt("VINA  TYPE II  CHROME", Modifier.align(Alignment.BottomCenter).padding(bottom = 17.dp), size = 9.sp, weight = FontWeight.Bold, color = Color(0xFF6B5A44), fontFamily = MONO)
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            VuMeter(levels.value.l, "L", Modifier.weight(1f))
-            VuMeter(levels.value.r, "R", Modifier.weight(1f))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BasicText(
-                "%04d".format(st.pos.longValue / 1000),
-                Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFF0E0B09)).border(1.dp, Color(0xFF3A2A12), RoundedCornerShape(4.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
-                style = TextStyle(color = amber, fontFamily = MONO, fontSize = 22.sp, fontWeight = FontWeight.Bold),
-            )
-            Lamp("${kbps(st)} KBPS", true, amber); Lamp("DIRECT", st.audiophile, amber); Lamp("EQ", st.eqActive, amber)
-        }
-        RetroSeek(st.pos, st.dur, amber, onSeek = act.onSeekTo)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-            ScrubButton(G.Prev, amber, -1, 50.dp, act.onPrev) { d -> act.scrub(st, d) }
-            PianoKey(G.Play, "PLAY", playing) { if (!playing) act.onToggle() }
-            PianoKey(G.Pause, "PAUSE", !playing && st.ps.hasItem) { if (playing) act.onToggle() }
-            PianoKey(G.Stop, "STOP", false) { act.stop(st) }
-            ScrubButton(G.Next, amber, 1, 50.dp, act.onNext) { d -> act.scrub(st, d) }
-        }
-        Txt("Tap REW / FF to skip, hold to scrub", size = 11.sp, color = Amoled.Muted)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            LabelBtn("EQ", amber, st.eqActive, act.onEq); LabelBtn("QUEUE", amber, false, act.onQueue); LabelBtn("LYRICS", amber, false, act.onLyrics)
-        }
-    }
-}
-
-/** A piano-style deck key. It really stays pressed down while its function is active. */
-@Composable
-private fun PianoKey(kind: G, label: String, pressed: Boolean, onClick: () -> Unit) {
-    val haptic = LocalHapticFeedback.current
-    Column(
-        Modifier.width(52.dp).offset(y = if (pressed) 4.dp else 0.dp).clip(RoundedCornerShape(4.dp))
-            .background(Brush.verticalGradient(if (pressed) listOf(Color(0xFF1E2024), Color(0xFF30343A)) else listOf(Color(0xFF5A606B), Color(0xFF2E3238))))
-            .border(1.dp, Color(0xFF8A92A0), RoundedCornerShape(4.dp))
-            .clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick() }.padding(vertical = 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Glyph(kind, Color(0xFFE8E2D0), 20.dp)
-        Txt(label, size = 8.sp, weight = FontWeight.Bold, color = Color(0xFFC8CDD6), fontFamily = MONO)
-    }
-}
-
-/** A backlit analogue VU meter with a dB scale; the needle is spring-damped, so it overshoots a little like the real thing. */
-@Composable
-private fun VuMeter(rawLevel: Float, label: String, modifier: Modifier) {
-    val needle by animateFloatAsState(dbLevel(rawLevel), spring(dampingRatio = 0.45f, stiffness = 380f), label = "vu")
-    val paint = remember { android.graphics.Paint().apply { isAntiAlias = true; color = 0xFF3B2A1A.toInt(); typeface = android.graphics.Typeface.MONOSPACE } }
-    Box(
-        modifier.height(92.dp).clip(RoundedCornerShape(8.dp))
-            .background(Brush.radialGradient(listOf(Color(0xFFFFF1CC), Color(0xFFE8D6A4)))).border(2.dp, Color(0xFF2B2420), RoundedCornerShape(8.dp)),
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val cx = size.width / 2
-            val cy = size.height * 0.95f
-            val len = size.height * 0.80f
-            paint.textSize = 9.sp.toPx()
-            val marks = listOf("-20", "-10", "-7", "-3", "0", "+3")
-            for (k in 0..10) {
-                val a = (-50.0 + k * 10.0) * PI / 180
-                val inner = len * (if (k % 2 == 0) 0.84f else 0.90f)
-                drawLine(if (k >= 7) Color(0xFFB3261E) else Color(0xFF3B2A1A), Offset(cx + inner * sin(a).toFloat(), cy - inner * cos(a).toFloat()), Offset(cx + len * sin(a).toFloat(), cy - len * cos(a).toFloat()), 2.dp.toPx())
-                if (k % 2 == 0) {
-                    val m = marks[k / 2]
-                    val tr = len * 0.70f
-                    drawContext.canvas.nativeCanvas.drawText(m, cx + tr * sin(a).toFloat() - paint.measureText(m) / 2, cy - tr * cos(a).toFloat(), paint)
-                }
-            }
-            val a = (-50.0 + needle.coerceIn(0f, 1.05f) * 100.0) * PI / 180
-            drawLine(Color(0xFF1A1512), Offset(cx, cy), Offset(cx + len * sin(a).toFloat(), cy - len * cos(a).toFloat()), 2.dp.toPx())
-            drawCircle(Color(0xFF1A1512), 5.dp.toPx(), Offset(cx, cy))
-        }
-        Txt("VU", Modifier.align(Alignment.TopCenter).padding(top = 6.dp), size = 10.sp, weight = FontWeight.Black, color = Color(0xFF3B2A1A), fontFamily = MONO)
-        Txt(label, Modifier.align(Alignment.BottomStart).padding(8.dp), size = 11.sp, weight = FontWeight.Bold, color = Color(0xFF3B2A1A), fontFamily = MONO)
     }
 }
 

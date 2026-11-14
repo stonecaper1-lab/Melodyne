@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.5
+- The Cassette skin is redesigned after a black-and-silver pocket cassette recorder, and takes the whole screen with the status bar hidden. A silver speaker grille whose holes breathe with the bass; a smoked-glass door with a real cassette behind it that slides in for every song; reels that turn at physically correct speeds (the small reel faster than the big one) while the tape moves from one spool to the other with the song's progress; a brushed-silver strip; silk-screened labels over piano keys that stay down while active, with a lamp on PLAY.
+- Hold REVIEW or CUE to wind (the reels spin fast), tap them to skip, drag along the door to seek, tap EJECT/PAUSE to pause, long-press it to eject (leave the screen). A ribbed volume slide sets the phone's real volume. EQ, Lyrics, Queue and Menu sit on the silver strip.
+
 ## v0.9.4
 - Settings, reorganised: five groups (Sound, Data & battery, Look & feel, Accounts & sources, App) of collapsible sections, each with a one-line summary of its current state. Playback and Sound quality are split, Car & Bluetooth lives under Sound quality, Frugal mode and Storage are together, the crash log sits inside About (and opens by itself when there is one), and the Appearance, Last.fm, AI and Custom source sections are unchanged inside.
 - Removed the private-repository option (the repository and GitHub token fields). Updates always come from the public release, and any token saved by an earlier version is deleted.

@@ -177,7 +177,7 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
         if (ps.isPlaying) 1f else 0.92f, spring(stiffness = Spring.StiffnessMediumLow), label = "breathe",
     )
 
-    ImmersiveMode(enabled = pb.skinEffective == "amp")
+    ImmersiveMode(enabled = Skins.isFullScreen(pb.skinEffective))
     val skinState = SkinState(ps, pos, dur, live, avg, pb.audiophile, eqState.shaping && !pb.audiophile, pb.infinite, pb.balance)
     val skinActions = SkinActions(
         onToggle = conn::toggle, onNext = conn::next, onPrev = conn::prev,
@@ -197,9 +197,9 @@ private fun NowPlayingContent(conn: PlayerConnection, ps: PlayerUiState, onClose
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x99000000), Color(0xE6000000), Color.Black))))
         }
 
-        // The Amp skin takes the whole screen: no top bar, no status bar, no navigation bar. Its own windows hold every control.
-        if (pb.skinEffective == "amp") {
-            SkinBody("amp", skinState, skinActions, Modifier.fillMaxSize())
+        // The Amp and Cassette skins take the whole screen: no top bar, no status bar, no navigation bar. Their own controls do everything.
+        if (Skins.isFullScreen(pb.skinEffective)) {
+            SkinBody(pb.skinEffective, skinState, skinActions, Modifier.fillMaxSize())
         } else Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
             // Top bar: close | title | infinite, EQ, add to playlist
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -21,7 +21,7 @@ object Skins {
         ),
         SkinSpec(
             "tape", "Cassette",
-            "A C-90 slides in. Reels turn as you play, tape moves from one spool to the other with the song's progress, spring-damped VU needles with a dB scale read the real levels, and the piano keys stay pressed while they are active. Hold rewind or fast-forward to scrub.",
+            "A black-and-silver pocket cassette recorder, full screen with the status bar hidden. A cassette slides in for every song, the reels turn at the right relative speeds while tape moves from one spool to the other, the speaker grille breathes with the bass, and the piano keys stay down while they are active. Hold review or cue to wind, drag along the door to seek, long-press eject to leave.",
             Color(0xFFFFB347),
         ),
         SkinSpec(
@@ -30,6 +30,9 @@ object Skins {
             Color(0xFFFFB000),
         ),
     )
+
+    /** Skins that take over the whole screen, status bar included. */
+    fun isFullScreen(id: String): Boolean = id == "amp" || id == "tape"
 
     fun byId(id: String): SkinSpec = ALL.firstOrNull { it.id == id } ?: ALL.first()
     fun accent(id: String): Color = byId(id).accent
