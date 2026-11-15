@@ -324,7 +324,9 @@ class CoreTest {
     @Test fun skinsAreUniqueAndUnknownIdsFallBackToLiquid() {
         assertEquals(Skins.ALL.size, Skins.ALL.map { it.id }.toSet().size)
         assertEquals("liquid", Skins.byId("nope").id)
-        assertTrue(Skins.ALL.map { it.id }.containsAll(listOf("liquid", "amp", "tape", "deck")))
+        assertTrue(Skins.ALL.map { it.id }.containsAll(listOf("liquid", "amp", "tape", "walkman", "deck")))
+        assertTrue(Skins.isFullScreen("walkman") && Skins.isFullScreen("amp") && Skins.isFullScreen("tape"))
+        assertFalse(Skins.isFullScreen("deck") || Skins.isFullScreen("liquid"))
     }
 
     // ---- skins and widget helpers ----

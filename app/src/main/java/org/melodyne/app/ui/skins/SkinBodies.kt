@@ -86,25 +86,26 @@ fun SkinBody(id: String, st: SkinState, act: SkinActions, modifier: Modifier = M
     when (id) {
         "amp" -> AmpBody(st, act, modifier)
         "tape" -> TapeBody(st, act, modifier)
+        "walkman" -> WalkmanBody(st, act, modifier)
         else -> DeckBody(st, act, modifier)
     }
 }
 
 private val MONO = FontFamily.Monospace
 
-private fun kbps(st: SkinState): String {
+internal fun kbps(st: SkinState): String {
     val k = if (st.live.intValue > 0) st.live.intValue else st.ps.quality?.kbps ?: 0
     return if (k > 0) "$k" else "---"
 }
 
-private fun khz(st: SkinState): String = st.ps.quality?.sampleRateHz?.takeIf { it > 0 }?.let { "%.0f".format(it / 1000f) } ?: "--"
+internal fun khz(st: SkinState): String = st.ps.quality?.sampleRateHz?.takeIf { it > 0 }?.let { "%.0f".format(it / 1000f) } ?: "--"
 
 /** Meters read in dB like real ones: 0..1 across the last 48 dB. */
 private fun dbLevel(p: Float): Float = ((20f * log10(p.coerceAtLeast(1e-4f)) + 48f) / 48f).coerceIn(0f, 1f)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Marquee(text: String, color: Color, size: Int, modifier: Modifier = Modifier) {
+internal fun Marquee(text: String, color: Color, size: Int, modifier: Modifier = Modifier) {
     BasicText(
         text, modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE),
         style = TextStyle(color = color, fontSize = size.sp, fontFamily = MONO, fontWeight = FontWeight.Bold),

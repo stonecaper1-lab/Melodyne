@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.11.0
+- New skin, Budokan: a well-loved mid-80s black metal pocket cassette player, full screen with the status bar hidden. Brushed gunmetal with grain, an uneven sheen (polished where hands rest), recessed panel lines, a bevel and Phillips screws; paint chipped off the edges and corners with bare aluminium showing through; micro-scratches that are denser where hands grip; gold lettering that is faded, smudged and chipped; a hazy, yellowed, scuffed window with dust trapped in its recessed rim; a cassette that slides in, whose reels turn at the right relative speeds with the tape moving from spool to spool; chunky green keys that sink when pressed (and stay down while active), worn smooth by finger oil; a ridged volume wheel; a warm red light that glows and flickers while playing; an LCD readout with the title, time and bitrate; a printed tape-position scale with a worn gold marker.
+- Mint, Used or Well loved (the default), and green or silver keys (collectors say the original had silver), in Settings > Appearance.
+- Fixes the build errors in the Cassette skin: a local variable hid the drawing scope's density, and one comparison was read as a type argument by the compiler.
+
 ## v0.10.2
 - Fixes a build error in the equaliser panel (a missing import).
 - Cassette skin, refined against the photo. The song title is no longer covered: the label now has its own writing band above the reel window, with the window and cassette re-proportioned like a real one (the writing used to run into the window, which painted over it).

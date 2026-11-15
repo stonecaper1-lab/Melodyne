@@ -82,7 +82,7 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.random.Random
 
-private const val CASSETTE_ASPECT = 1.587f           // a real cassette is 102 x 64 mm
+internal const val CASSETTE_ASPECT = 1.587f           // a real cassette is 102 x 64 mm
 private val MONO_T = FontFamily.Monospace
 private val INK = Color(0xFF1B1C1F)
 private val GLYPH = Color(0xFF7D8189)
@@ -102,7 +102,7 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
     val volume = rememberSystemVolume()
     val playing = st.ps.isPlaying
     val loaded = st.ps.hasItem
-    val density = LocalDensity.current
+    val uiDensity = LocalDensity.current
     val wear = remember { ServiceLocator.prefs.getInt(TAPE_WEAR_PREF, 1).coerceIn(0, 2) }
 
     val progress = if (st.dur.longValue > 0) (st.pos.longValue.toFloat() / st.dur.longValue).coerceIn(0f, 1f) else 0f
@@ -194,7 +194,7 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                 val cassH = cassW / CASSETTE_ASPECT
                 val cassX = (maxWidth - cassW) / 2
                 val cassY = topPad + (maxHeight - topPad - cassH) / 2
-                val cassHPx = with(density) { cassH.toPx() }
+                val cassHPx = with(uiDensity) { cassH.toPx() }
 
                 Canvas(Modifier.fillMaxSize()) {
                     val x = cassX.toPx(); val y = cassY.toPx(); val cw = cassW.toPx(); val ch = cassH.toPx()
@@ -212,8 +212,8 @@ internal fun TapeBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                     )
                     Txt("AC/BATTERY", Modifier.padding(start = 10.dp), size = 10.sp, color = Color.White.copy(alpha = 0.85f), fontFamily = MONO_T)
                 }
-                val titleSp = with(density) { (cassH * 0.082f).toSp() }
-                val artistSp = with(density) { (cassH * 0.062f).toSp() }
+                val titleSp = with(uiDensity) { (cassH * 0.082f).toSp() }
+                val artistSp = with(uiDensity) { (cassH * 0.062f).toSp() }
                 if (loaded) {
                     // The writing sits in its own band on the label, above the reel window, so nothing is drawn over it.
                     Column(
@@ -340,7 +340,7 @@ private fun KeyLabel(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun DoubleArrow(left: Boolean, color: Color) {
+internal fun DoubleArrow(left: Boolean, color: Color) {
     Canvas(Modifier.size(width = 26.dp, height = 18.dp)) {
         val w = size.width
         val h = size.height
@@ -426,11 +426,11 @@ private fun VolumeSlide(volume: VolumeControl) {
 // ------------------------------------------------------------------ the marks of use
 // Everything below is generated from a fixed seed, so the same machine shows the same scratches every time.
 
-private class MLine(val a: Offset, val b: Offset, val color: Color, val w: Float)
-private class MDot(val c: Offset, val r: Float, val color: Color)
-private class MOval(val topLeft: Offset, val size: Size, val color: Color)
+internal class MLine(val a: Offset, val b: Offset, val color: Color, val w: Float)
+internal class MDot(val c: Offset, val r: Float, val color: Color)
+internal class MOval(val topLeft: Offset, val size: Size, val color: Color)
 
-private class Marks(val ovals: List<MOval>, val lines: List<MLine>, val dots: List<MDot>) {
+internal class Marks(val ovals: List<MOval>, val lines: List<MLine>, val dots: List<MDot>) {
     fun draw(s: DrawScope) {
         for (o in ovals) s.drawOval(o.color, o.topLeft, o.size)
         for (l in lines) s.drawLine(l.color, l.a, l.b, l.w, StrokeCap.Round)
@@ -439,7 +439,7 @@ private class Marks(val ovals: List<MOval>, val lines: List<MLine>, val dots: Li
 }
 
 /** Scratches, dust specks and smudges scattered over a [w] x [h] surface. [wear] 1 = used, 2 = well worn. */
-private fun scatter(
+internal fun scatter(
     w: Float, h: Float, wear: Int, seed: Int, density: Float, scratches: Int, dust: Int, smudges: Int,
     light: Color = Color.White, dark: Color = Color.Black, scratchLen: Float = 0.16f,
 ): Marks {
@@ -514,13 +514,14 @@ private class Grille(size: Size, density: Float, private val wear: Int) {
         val cy = py + ph / 2
         val maxD = hypot(pw / 2, ph / 2)
         val rnd = Random(5)
+        val clogRate = if (wear > 1) 0.035f else 0.012f           // a few holes are blocked with lint
         for (i in 0 until rows) for (j in 0 until cols) {
             val p = Offset(offX + j * pitch, offY + i * pitch)
             val d = hypot(p.x - cx, p.y - cy) / maxD
             val ring = if (d < 0.33f) 0 else if (d < 0.66f) 1 else 2
             rings[ring].add(p)
             rims[ring].add(Offset(p.x + 0.6f, p.y + 0.9f))
-            if (wear > 0 && rnd.nextFloat() < (if (wear > 1) 0.035f else 0.012f)) clogged.add(p)       // a few holes are blocked with lint
+            if (wear > 0 && rnd.nextFloat() < clogRate) clogged.add(p)
         }
         // scratches show black on the silver, as in the photo, with a few bright ones
         marks = scatter(w, h, wear, 3, density, scratches = 12, dust = 50, smudges = 6, light = Color.White, dark = Color(0xFF1B1C1F), scratchLen = 0.30f)
@@ -594,7 +595,7 @@ private fun DrawScope.drawInsertArrow(c: Offset, w: Float) {
  * A cassette seen through the door, on the proportions of a real one: the label on top with the coloured stripe and a
  * band of ruled lines for the writing, then the reel window, then the shell's bottom with heads, rollers and moving tape.
  */
-private fun DrawScope.drawCassette(x: Float, y: Float, cw: Float, ch: Float, rotL: Float, rotR: Float, p: Float, playing: Boolean, wear: Int) {
+internal fun DrawScope.drawCassette(x: Float, y: Float, cw: Float, ch: Float, rotL: Float, rotR: Float, p: Float, playing: Boolean, wear: Int) {
     val corner = CornerRadius(ch * 0.06f)
     drawRoundRect(Color(0xFF2A2B2F), Offset(x, y), Size(cw, ch), corner)
     drawRoundRect(Color(0xFF3C3E43), Offset(x, y), Size(cw, ch), corner, style = Stroke(1.5f))

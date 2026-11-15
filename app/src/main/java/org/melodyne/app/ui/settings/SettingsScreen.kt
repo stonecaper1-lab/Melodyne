@@ -95,6 +95,8 @@ fun SettingsScreen() {
     var aiModel by remember(s.ai) { mutableStateOf(s.ai.model) }
     var notifyOn by remember { mutableStateOf(ServiceLocator.updates.notifyEnabled) }
     var tapeWear by remember { mutableStateOf(ServiceLocator.prefs.getInt(org.melodyne.app.ui.skins.TAPE_WEAR_PREF, 1)) }
+    var walkmanWear by remember { mutableStateOf(ServiceLocator.prefs.getInt(org.melodyne.app.ui.skins.WALKMAN_WEAR_PREF, 2)) }
+    var walkmanSilver by remember { mutableStateOf(ServiceLocator.prefs.getInt(org.melodyne.app.ui.skins.WALKMAN_BUTTONS_PREF, 0) == 1) }
     var modeNotice by remember { mutableStateOf(ServiceLocator.prefs.getBoolean("mode_notice", true)) }
     var clearOnExit by remember { mutableStateOf(CacheCleaner.enabled()) }
     var cacheBytes by remember { mutableLongStateOf(-1L) }
@@ -296,6 +298,20 @@ fun SettingsScreen() {
                     }
                 }
                 Txt("Scratches, dust, smudges and scuffs on the machine. Mint is factory-new; Well worn has seen a lot of use.", size = 12.sp, color = Amoled.Muted, maxLines = 3)
+            }
+            if (pb.skin == "walkman") {
+                Txt("Player wear", size = 14.sp, weight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Mint", "Used", "Well loved").forEachIndexed { i, name ->
+                        Chip(name, walkmanWear == i) { walkmanWear = i; ServiceLocator.prefs.edit().putInt(org.melodyne.app.ui.skins.WALKMAN_WEAR_PREF, i).apply() }
+                    }
+                }
+                Txt("Key colour", size = 14.sp, weight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("Green", !walkmanSilver) { walkmanSilver = false; ServiceLocator.prefs.edit().putInt(org.melodyne.app.ui.skins.WALKMAN_BUTTONS_PREF, 0).apply() }
+                    Chip("Silver (original)", walkmanSilver) { walkmanSilver = true; ServiceLocator.prefs.edit().putInt(org.melodyne.app.ui.skins.WALKMAN_BUTTONS_PREF, 1).apply() }
+                }
+                Txt("Collectors report that the original players had silver keys. Green is the look this skin is built around. Well loved shows chipped edges, scratches, worn lettering and a hazy, scuffed window.", size = 12.sp, color = Amoled.Muted, maxLines = 5)
             }
             Pill("Add the Now Playing widget", filled = false) {
                 runCatching {

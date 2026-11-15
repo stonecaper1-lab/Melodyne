@@ -16,13 +16,18 @@ object Skins {
         SkinSpec(LIQUID, "Liquid", "The default: liquid glass, blurred artwork and your song's own colour.", Color(0xFF1DE9B6)),
         SkinSpec(
             "amp", "Classic Amp",
-            "The 90s desktop player, full screen with the status bar hidden (swipe from the edge to peek), window by window: a titled main window you can shade or close, seven-segment time (tap to flip elapsed and remaining), a real spectrum with falling peak caps, live kbps and kHz, a scrolling title, green-to-red volume and balance bars, an Equalizer window with your seven bands and a playlist window you can tap to jump around.",
+            "The 90s desktop player, full screen with the status bar hidden (swipe from the edge to peek), window by window: a titled main window you can shade or close, seven-segment time (tap to flip elapsed and remaining), a real spectrum with falling peak caps, live kbps and kHz, a scrolling title, green-to-red volume and balance bars, an Equalizer window with your ten bands and a playlist window you can tap to jump around.",
             Color(0xFF00FF66),
         ),
         SkinSpec(
             "tape", "Cassette",
             "A black-and-silver pocket cassette recorder, full screen with the status bar hidden. A cassette slides in for every song, the reels turn at the right relative speeds while tape moves from one spool to the other, the speaker grille breathes with the bass, and the piano keys stay down while they are active. It carries the marks of use (scratches, dust, smudges, scuffs; set the wear in Settings). Hold review or cue to wind, drag along the door to seek, long-press eject to leave.",
             Color(0xFFFFB347),
+        ),
+        SkinSpec(
+            "walkman", "Budokan",
+            "A well-loved mid-80s black metal pocket cassette player, full screen with the status bar hidden. Brushed gunmetal with chipped edges and scratches where hands grip it, worn gold lettering, a yellowed scuffed window with a cassette whose reels turn, chunky green keys that sink when pressed, a ridged volume wheel, a warm red operation light, and an LCD readout. Tap REW or FF to skip and hold to wind, drag the window or the tape scale to seek, and press EJECT to leave. Choose the wear and the key colour (green, or the original silver) in Settings.",
+            Color(0xFFE2B01E),
         ),
         SkinSpec(
             "deck", "Receiver",
@@ -32,7 +37,7 @@ object Skins {
     )
 
     /** Skins that take over the whole screen, status bar included. */
-    fun isFullScreen(id: String): Boolean = id == "amp" || id == "tape"
+    fun isFullScreen(id: String): Boolean = id == "amp" || id == "tape" || id == "walkman"
 
     fun byId(id: String): SkinSpec = ALL.firstOrNull { it.id == id } ?: ALL.first()
     fun accent(id: String): Color = byId(id).accent
@@ -40,6 +45,7 @@ object Skins {
     fun background(id: String): Brush = when (id) {
         "amp" -> Brush.verticalGradient(listOf(Color(0xFF14171B), Color(0xFF0A0C0E)))
         "tape" -> Brush.verticalGradient(listOf(Color(0xFF241B16), Color(0xFF120D0A)))
+        "walkman" -> Brush.verticalGradient(listOf(Color(0xFF26282B), Color(0xFF111214)))
         "deck" -> Brush.verticalGradient(listOf(Color(0xFF1B1B1D), Color(0xFF0B0B0C)))
         else -> Brush.verticalGradient(listOf(Color.Black, Color.Black))
     }
