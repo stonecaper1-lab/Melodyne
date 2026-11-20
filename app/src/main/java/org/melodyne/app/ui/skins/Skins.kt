@@ -25,8 +25,8 @@ object Skins {
             Color(0xFFFFB347),
         ),
         SkinSpec(
-            "walkman", "Budokan",
-            "A well-loved mid-80s black metal pocket cassette player, full screen with the status bar hidden. Brushed gunmetal with chipped edges and scratches where hands grip it, worn gold lettering, a yellowed scuffed window with a cassette whose reels turn, chunky green keys that sink when pressed, a ridged volume wheel, a warm red operation light, and an LCD readout. Tap REW or FF to skip and hold to wind, drag the window or the tape scale to seek, and press EJECT to leave. Choose the wear and the key colour (green, or the original silver) in Settings.",
+            "walkman", "Boodo Khan",
+            "The 1986 pocket cassette player, as it looks after decades of use. The front face with its diagonal brushed band, silver keys and green PLAY slider (REW and FF skip on a tap and wind while held, PLAY starts and pauses, STOP stops, and the DOL switch is the Loudness boost); the back with the cassette lying horizontally behind its window, reels turning at the right relative speeds (drag along the window to seek); and the top edge with its ribbed volume wheel. Full screen, with the status bar hidden.",
             Color(0xFFE2B01E),
         ),
         SkinSpec(

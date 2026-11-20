@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.1
+- The Boodo Khan skin is rebuilt to match the real player, from the reference photographs and the catalogue page, instead of from descriptions. The front face is drawn in the photograph's own proportions: the two diagonal seams at 41.5 degrees, the measured shading across the brushed band, the REW, FF and STOP keys and the green PLAY slider at their true positions, the battery window and red light, every line of printing (the kanji, BOODO KHAN in blue, the Dolby marks, the labels) placed exactly, and the DOL switch. Only the Sony wordmark is replaced, by VINA.
+- The cassette now lies horizontally: the back of the player is shown turned a quarter turn, with the cream reels cut off by the window as on the real unit, turning at the right relative speeds, and the song title on the cassette's label strip. Drag along the window to seek. The top edge shows the headphone jacks and a ribbed volume wheel (drag it to set the phone's volume).
+- Silver keys and a well-worn finish are fixed, as asked: no settings. Wear is modelled on how these players age: paint lost at edges and corners, scratches where hands hold it, worn printing, grime in the seams.
+- The DOL switch is the Loudness boost. In landscape the front stands beside the other two views.
+
 ## v0.11.0
 - New skin, Budokan: a well-loved mid-80s black metal pocket cassette player, full screen with the status bar hidden. Brushed gunmetal with grain, an uneven sheen (polished where hands rest), recessed panel lines, a bevel and Phillips screws; paint chipped off the edges and corners with bare aluminium showing through; micro-scratches that are denser where hands grip; gold lettering that is faded, smudged and chipped; a hazy, yellowed, scuffed window with dust trapped in its recessed rim; a cassette that slides in, whose reels turn at the right relative speeds with the tape moving from spool to spool; chunky green keys that sink when pressed (and stay down while active), worn smooth by finger oil; a ridged volume wheel; a warm red light that glows and flickers while playing; an LCD readout with the title, time and bitrate; a printed tape-position scale with a worn gold marker.
 - Mint, Used or Well loved (the default), and green or silver keys (collectors say the original had silver), in Settings > Appearance.

@@ -1,5 +1,7 @@
 package org.melodyne.app.ui.skins
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -11,33 +13,25 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,56 +44,108 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.melodyne.app.di.ServiceLocator
-import org.melodyne.app.ui.G
-import org.melodyne.app.ui.Glyph
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
 
-/** How worn the player looks: 0 mint, 1 used, 2 well loved (the default). Chosen in Settings > Appearance. */
-const val WALKMAN_WEAR_PREF = "walkman_wear"
-/** Transport button colour: 0 green (the look this skin is built around), 1 silver (what the original actually had). */
-const val WALKMAN_BUTTONS_PREF = "walkman_buttons"
+// ======================================================================================================
+// Sony DD-100 "Boodo Khan" (1986), as measured from the reference photographs.
+//
+// The front face is drawn in the pixel coordinates of the reference photo: the body is 766 x 1080. The band that carries
+// the lettering and the controls runs at 41.5 degrees, so most of the lettering is placed in a rotated frame:
+// "u" runs along the text (rising to the right) and "v" across it, with the origin at the centre of the face.
+// Only the Sony wordmark is replaced (by VINA). Everything else is as the original prints it.
+// The player always looks well loved, and has the silver keys of the original.
+// ======================================================================================================
 
-private val GOLD = Color(0xFFE2B01E)
-private val BODY_INK = Color(0xFF202225)           // the colour printed lettering wears down to
-private val LCD_INK = Color(0xFF273122)
-private val MONO_W = FontFamily.Monospace
+private const val FW = 766f
+private const val FH = 1080f
+private const val ANG = 41.5f
+private const val CX = 383f
+private const val CY = 540f
+private val COSA = cos(Math.toRadians(ANG.toDouble())).toFloat()
+private val SINA = sin(Math.toRadians(ANG.toDouble())).toFloat()
 
-/** The tape's moving parts, shared between the door, the keys and the frame loop. */
+/** Band frame (u along the text, v across it) to reference pixels. */
+private fun ref(u: Float, v: Float): Offset = Offset(CX + u * COSA + v * SINA, CY - u * SINA + v * COSA)
+
+/** Reference pixels to the band frame. */
+private fun toBand(x: Float, y: Float): Offset = Offset((x - CX) * COSA - (y - CY) * SINA, (x - CX) * SINA + (y - CY) * COSA)
+
+// Control centres in the band frame, measured from the photograph.
+private val REW_UV = Offset(367f, -206f)
+private val FF_UV = Offset(247f, -207f)
+private val STOP_UV = Offset(311f, 7f)
+private val PLAY_UV = Offset(182f, -96f)
+private val LED_UV = Offset(484f, -101f)
+
+/** How bright the anodised face is, as a function of the distance across the band. Measured, not guessed. */
+private val SHADE = listOf(
+    -660f to 150f, -590f to 141f, -510f to 124f, -430f to 108f, -350f to 92f, -324f to 94f,
+    -310f to 100f, -270f to 105f, -230f to 89f, -190f to 88f, -150f to 80f, -100f to 85f, -30f to 88f,
+    10f to 67f, 50f to 43f, 90f to 28f, 118f to 26f, 130f to 35f, 170f to 32f, 210f to 28f, 250f to 25f, 330f to 22f, 450f to 20f, 660f to 18f,
+)
+
+private fun shadeAt(v: Float): Float {
+    if (v <= SHADE.first().first) return SHADE.first().second
+    if (v >= SHADE.last().first) return SHADE.last().second
+    val i = SHADE.indexOfLast { it.first <= v }
+    val (v0, l0) = SHADE[i]
+    val (v1, l1) = SHADE[i + 1]
+    return l0 + (l1 - l0) * ((v - v0) / (v1 - v0))
+}
+
+private fun lumColor(l: Float): Color {
+    val c = l.coerceIn(0f, 255f) / 255f
+    return Color(min(1f, c + 0.004f), c, max(0f, c - 0.01f))
+}
+
+private val INK_WHITE = Color(0xFFEEEBE2)
+private val INK_BLUE = Color(0xFF5477E0)
+private val SILVER_TOP = Color(0xFFFBFBF9)
+private val SILVER_MID = Color(0xFFE2E3DF)
+private val SILVER_LOW = Color(0xFFB4B5B0)
+private val GREEN_RING = Color(0xFF1EC28C)
+
 private class Motion {
     var dragFrac by mutableStateOf<Float?>(null)
     var scrubDir by mutableIntStateOf(0)
@@ -108,24 +154,59 @@ private class Motion {
     val rotR = mutableFloatStateOf(0f)
 }
 
+private fun DrawScope.band(block: DrawScope.() -> Unit) {
+    translate(CX, CY) { rotate(-ANG, Offset.Zero) { block() } }
+}
+
+private fun paintOf(color: Color, size: Float, face: Typeface): Paint =
+    Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color.toArgb(); textSize = size; typeface = face; isSubpixelText = true }
+
+private val SANS_MEDIUM: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+private val SANS_BOLD: Typeface = Typeface.create("sans-serif", Typeface.BOLD)
+private val SERIF_BOLD: Typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+private val SANS_REG: Typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+private val SANS_LIGHT: Typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+
+/** Draws [text] with its glyph box centred on [vc], starting at [u0] (or centred / right-aligned), stretched to [len] if given. */
+private fun DrawScope.fitText(text: String, p: Paint, u0: Float, vc: Float, len: Float? = null, center: Boolean = false, right: Boolean = false) {
+    p.letterSpacing = 0f
+    if (len != null && text.length > 1) {
+        val natural = p.measureText(text)
+        p.letterSpacing = ((len - natural) / (text.length - 1)) / p.textSize
+    }
+    val r = android.graphics.Rect()
+    p.getTextBounds(text, 0, text.length, r)
+    val w = p.measureText(text)
+    val x = when {
+        center -> u0 - w / 2f
+        right -> u0 - w
+        else -> u0 - r.left
+    }
+    val y = vc - (r.top + r.bottom) / 2f
+    drawContext.canvas.nativeCanvas.drawText(text, x, y, p)
+}
+
+// ------------------------------------------------------------------------------------------------------
+//  The skin
+// ------------------------------------------------------------------------------------------------------
+
 /**
- * A black metal pocket cassette player from the mid-80s, full screen and well loved: brushed gunmetal with chipped
- * edges and scratches where hands grip it, worn gold lettering, a yellowed scuffed window with a real cassette whose
- * reels turn, chunky keys that sink when pressed, a ridged volume wheel, a warm red LED and a small LCD readout.
- * Keys: REW and FF skip on a tap and wind while held; PAUSE toggles; EJECT leaves the screen.
+ * The front of the player (controls), its back (the cassette, lying horizontally), and its top edge (volume wheel and
+ * headphone jacks), on a dark wooden table. In portrait they stack; in landscape the front stands beside the other two.
+ * REW and FF skip on a tap and wind while held; PLAY starts and pauses; STOP stops; the DOL switch is the Loudness
+ * preset; the wheel on the top edge is the volume; dragging along the cassette window seeks.
  */
 @Composable
 internal fun WalkmanBody(st: SkinState, act: SkinActions, modifier: Modifier) {
     val volume = rememberSystemVolume()
     val playing = st.ps.isPlaying
     val loaded = st.ps.hasItem
-    val wear = remember { ServiceLocator.prefs.getInt(WALKMAN_WEAR_PREF, 2).coerceIn(0, 2) }
-    val silver = remember { ServiceLocator.prefs.getInt(WALKMAN_BUTTONS_PREF, 0) == 1 }
     val m = remember { Motion() }
+    val eq by ServiceLocator.eq.state.collectAsState()
+    val dolOn = eq.presetId == "low_volume"
 
     val progress = if (st.dur.longValue > 0) (st.pos.longValue.toFloat() / st.dur.longValue).coerceIn(0f, 1f) else 0f
     val shownProgress by rememberUpdatedState(m.dragFrac ?: progress)
-    val currentProgress by rememberUpdatedState(progress)
     val spinning by rememberUpdatedState(playing && loaded)
 
     // The tape moves at a constant speed, so the small, fast reel turns quicker than the big, slow one.
@@ -138,8 +219,8 @@ internal fun WalkmanBody(st: SkinState, act: SkinActions, modifier: Modifier) {
                 val speed = when { scrubbing -> 7f * m.scrubDir; spinning -> 1f; else -> 0f }
                 if (speed != 0f) {
                     val p = shownProgress
-                    m.rotL.floatValue = (m.rotL.floatValue - 80f * speed / (1f - 0.55f * p) * dt) % 360f
-                    m.rotR.floatValue = (m.rotR.floatValue - 80f * speed / (0.45f + 0.55f * p) * dt) % 360f
+                    m.rotL.floatValue = (m.rotL.floatValue + 80f * speed / (1f - 0.55f * p) * dt) % 360f
+                    m.rotR.floatValue = (m.rotR.floatValue + 80f * speed / (0.45f + 0.55f * p) * dt) % 360f
                 }
             }
             last = t
@@ -148,601 +229,843 @@ internal fun WalkmanBody(st: SkinState, act: SkinActions, modifier: Modifier) {
     val insert = remember { Animatable(0f) }
     LaunchedEffect(st.ps.songId, loaded) {
         insert.snapTo(0f)
-        if (loaded) insert.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow))
+        if (loaded) insert.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow))
     }
 
     Box(
-        modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF2F3135), Color(0xFF1F2124), Color(0xFF2A2C30))))
-            .drawWithCache {
-                val art = BodyArt(size.width, size.height, density, wear)
-                onDrawWithContent {
-                    art.drawBase(this)
-                    drawContent()
-                    art.drawWear(this)
-                }
-            },
-    ) {
-        Column(
-            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            // ---------------------------------------------------------------- lettering and the operation light
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    WornText("VINA", 34.sp, wear, 1, italic = true, weight = FontWeight.ExtraBold)
-                    WornText("STEREO CASSETTE PLAYER", 8.sp, wear, 2, mono = true)
-                }
-                Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Led(playing)
-                    WornText("OPR/BATT", 7.sp, wear, 3, mono = true)
-                }
-            }
-
-            // ---------------------------------------------------------------- door with the cassette, and the volume wheel
-            Row(Modifier.fillMaxWidth().weight(0.46f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CassetteDoor(
-                    st, act, m, wear, loaded, spinning, { currentProgress }, { shownProgress }, { insert.value },
-                    Modifier.weight(1f).fillMaxHeight(),
-                )
-                Column(Modifier.width(34.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    WornText("VOL", 8.sp, wear, 4, mono = true)
-                    Spacer(Modifier.height(4.dp))
-                    VolumeWheel(volume, wear, Modifier.width(34.dp).weight(0.7f))
-                }
-            }
-
-            // ---------------------------------------------------------------- the LCD readout and the tape position
-            LcdReadout(st, wear)
-            TapeBar(st, wear) { act.onSeekTo(it) }
-
-            // ---------------------------------------------------------------- little recessed switches
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MiniSwitch("EQ", wear, 11, Modifier.weight(1f), act.onEq)
-                MiniSwitch("LYRICS", wear, 12, Modifier.weight(1f), act.onLyrics)
-                MiniSwitch("QUEUE", wear, 13, Modifier.weight(1f), act.onQueue)
-                MiniSwitch("MENU", wear, 14, Modifier.weight(1f), act.onMenu)
-                MiniSwitch("EJECT", wear, 15, Modifier.weight(1f), act.onClose)
-            }
-
-            // ---------------------------------------------------------------- the chunky keys
-            Row(Modifier.fillMaxWidth().height(84.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                WmKey(
-                    Modifier.weight(1f), latched = false, silver = silver, wear = wear, seed = 21, repeatDir = -1,
-                    onRepeat = { d -> act.scrub(st, d); m.scrubDir = d; m.scrubAt = System.currentTimeMillis() }, onTap = act.onPrev,
-                ) { DoubleArrow(left = true, color = keyInk(silver)) }
-                WmKey(Modifier.weight(1f), latched = playing, silver = silver, wear = wear, seed = 22, onTap = { if (!playing) act.onToggle() }) {
-                    Glyph(G.Play, keyInk(silver), 24.dp)
-                }
-                WmKey(
-                    Modifier.weight(1f), latched = false, silver = silver, wear = wear, seed = 23, repeatDir = 1,
-                    onRepeat = { d -> act.scrub(st, d); m.scrubDir = d; m.scrubAt = System.currentTimeMillis() }, onTap = act.onNext,
-                ) { DoubleArrow(left = false, color = keyInk(silver)) }
-                WmKey(Modifier.weight(1f), latched = !playing && loaded, silver = silver, wear = wear, seed = 24, onTap = { if (loaded) act.onToggle() }) {
-                    Glyph(G.Pause, keyInk(silver), 24.dp)
-                }
-                WmKey(Modifier.weight(1f), latched = false, silver = silver, wear = wear, seed = 25, onTap = { act.stop(st) }) {
-                    Glyph(G.Stop, keyInk(silver), 22.dp)
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                listOf("REW", "PLAY", "FF", "PAUSE", "STOP").forEachIndexed { i, label ->
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { WornText(label, 8.sp, wear, 30 + i, mono = true) }
-                }
-            }
-        }
-    }
-}
-
-private fun keyInk(silver: Boolean): Color = if (silver) Color(0xCC1B1C1F) else Color(0xCC0A2D12)
-
-// ------------------------------------------------------------------ lettering that has been worn by thumbs
-
-private class WornMask(val fade: Brush, val marks: Marks) {
-    fun draw(s: DrawScope) {
-        s.drawRect(fade)
-        marks.draw(s)
-    }
-}
-
-/** Paint chips, smudges and a fade, all in the colour of the case, laid over printed lettering so it looks rubbed away. */
-private fun wornMask(w: Float, h: Float, wear: Int, seed: Int, d: Float): WornMask {
-    val rnd = Random(seed)
-    val k = if (wear >= 2) 1.8f else 1f
-    val lines = ArrayList<MLine>(); val dots = ArrayList<MDot>(); val ovals = ArrayList<MOval>()
-    repeat((4 * k).toInt()) {
-        val x = rnd.nextFloat() * w
-        val y = rnd.nextFloat() * h
-        val a = rnd.nextFloat() * PI.toFloat()
-        val len = (0.2f + rnd.nextFloat() * 0.5f) * h
-        lines += MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), BODY_INK.copy(alpha = 0.75f + rnd.nextFloat() * 0.2f), (0.8f + rnd.nextFloat()) * d)
-    }
-    repeat((12 * k).toInt()) {
-        dots += MDot(Offset(rnd.nextFloat() * w, rnd.nextFloat() * h), (0.5f + rnd.nextFloat() * 1.2f) * d, BODY_INK.copy(alpha = 0.7f + rnd.nextFloat() * 0.25f))
-    }
-    repeat((2 * k).toInt()) {
-        val sw = (0.2f + rnd.nextFloat() * 0.4f) * w
-        ovals += MOval(Offset(rnd.nextFloat() * (w - sw), 0f), Size(sw, h), BODY_INK.copy(alpha = 0.12f + rnd.nextFloat() * 0.18f))
-    }
-    val edge = BODY_INK.copy(alpha = 0.18f + rnd.nextFloat() * 0.35f)
-    val fade = if (rnd.nextBoolean()) Brush.horizontalGradient(listOf(Color.Transparent, edge), 0f, w) else Brush.horizontalGradient(listOf(edge, Color.Transparent), 0f, w)
-    return WornMask(fade, Marks(ovals, lines, dots))
-}
-
-@Composable
-private fun WornText(
-    text: String, fontSize: TextUnit, wear: Int, seed: Int, modifier: Modifier = Modifier,
-    italic: Boolean = false, mono: Boolean = false, weight: FontWeight = FontWeight.Bold, color: Color = GOLD,
-) {
-    Box(
-        modifier.drawWithCache {
-            val mask = if (wear > 0) wornMask(size.width, size.height, wear, seed, density) else null
+        modifier.fillMaxSize().drawWithCache {
+            val wood = Wood(size.width, size.height, density)
             onDrawWithContent {
+                wood.draw(this)
                 drawContent()
-                mask?.draw(this)
             }
         },
     ) {
-        BasicText(
-            text,
-            style = TextStyle(
-                color = color, fontSize = fontSize, fontWeight = weight, fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
-                fontFamily = if (mono) MONO_W else FontFamily.SansSerif,
-            ),
-            maxLines = 1, softWrap = false,
-        )
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp), contentAlignment = Alignment.Center) {
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                val aw = maxWidth.value
+                val ah = maxHeight.value
+                val gap = 8f
+                val actionH = 34f
+                if (aw > ah * 1.15f) {
+                    // landscape: the front stands on the left; the cassette side, the top edge and the buttons stack on the right
+                    val frontW = min((ah - 4f) / (FH / FW), aw * 0.34f)
+                    val colW = min(aw - frontW - 24f, (ah - actionH - 2f * gap) / (BACK_H / BACK_W + 0.8f / STRIP_ASPECT))
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                        FrontFace(st, act, m, playing, dolOn, { ServiceLocator.eq.setPreset(if (dolOn) "flat" else "low_volume") }, frontW.dp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(gap.dp)) {
+                            BackPanel(st, m, loaded, spinning, { shownProgress }, { insert.value }, act, colW.dp)
+                            TopStrip(volume, (colW * 0.8f).dp)
+                            ActionRow(st, act, colW.dp)
+                        }
+                    }
+                } else {
+                    // portrait: cassette side on top, front below it, then the top edge with the volume wheel, then the buttons
+                    val w = min(aw, (ah - actionH - 3f * gap) / (BACK_H / BACK_W + FH / FW + 1f / STRIP_ASPECT))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(gap.dp)) {
+                        BackPanel(st, m, loaded, spinning, { shownProgress }, { insert.value }, act, w.dp)
+                        FrontFace(st, act, m, playing, dolOn, { ServiceLocator.eq.setPreset(if (dolOn) "flat" else "low_volume") }, w.dp)
+                        TopStrip(volume, w.dp)
+                        ActionRow(st, act, w.dp)
+                    }
+                }
+            }
+        }
     }
 }
 
-// ------------------------------------------------------------------ the metal case
+private const val BACK_W = 990f
+private const val BACK_H = 677f
+private const val STRIP_W = 1000f
+private const val STRIP_H = 345f
+private const val STRIP_ASPECT = STRIP_W / STRIP_H
 
-private class Fleck(val path: Path, val alpha: Float)
-
-/** Everything drawn on the case itself, generated once from fixed seeds so the same player looks the same every time. */
-private class BodyArt(private val w: Float, private val h: Float, private val d: Float, private val wear: Int) {
-    private val grainLight = ArrayList<Offset>()
-    private val grainDark = ArrayList<Offset>()
-    private val scratches = ArrayList<MLine>()
-    private val flecks = ArrayList<Fleck>()
-    private val screws = listOf(Offset(16f * d, 16f * d), Offset(w - 16f * d, 16f * d), Offset(16f * d, h - 16f * d), Offset(w - 16f * d, h - 16f * d))
+/** A very dark walnut table with a soft vignette, like the one in the product photographs. */
+private class Wood(private val w: Float, private val h: Float, private val d: Float) {
+    private val grain = ArrayList<MLine>()
 
     init {
-        val rnd = Random(86)
-        repeat(if (wear > 0) 2600 else 900) {
-            grainLight.add(Offset(rnd.nextFloat() * w, rnd.nextFloat() * h))
-            grainDark.add(Offset(rnd.nextFloat() * w, rnd.nextFloat() * h))
-        }
-        if (wear > 0) {
-            // hands grip the lower half and the right-hand edge, so scratches are denser there, mostly running across the grain
-            repeat(if (wear > 1) 340 else 140) {
-                val gripped = rnd.nextFloat() < 0.65f
-                val y = if (gripped) h * (0.45f + 0.55f * rnd.nextFloat().pow(0.7f)) else rnd.nextFloat() * h
-                val x = if (gripped && rnd.nextBoolean()) w * (0.6f + 0.4f * rnd.nextFloat()) else rnd.nextFloat() * w
-                val a = if (rnd.nextFloat() < 0.7f) (rnd.nextFloat() - 0.5f) * 0.9f else rnd.nextFloat() * PI.toFloat()
-                val len = (6f + rnd.nextFloat() * 34f) * d
-                scratches += MLine(
-                    Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len),
-                    (if (rnd.nextFloat() < 0.75f) Color(0xFFD5D8DE) else Color.Black).copy(alpha = 0.06f + rnd.nextFloat() * 0.18f), (0.5f + rnd.nextFloat() * 0.6f) * d,
-                )
-            }
-            repeat(if (wear > 1) 9 else 4) {                      // a few long hairline scuffs
-                val x = rnd.nextFloat() * w
-                val y = rnd.nextFloat() * h
-                val a = (rnd.nextFloat() - 0.5f) * 0.5f
-                val len = (60f + rnd.nextFloat() * 90f) * d
-                scratches += MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), Color(0xFFD5D8DE).copy(alpha = 0.05f + rnd.nextFloat() * 0.07f), 0.7f * d)
-            }
-            // paint worn off the edges and corners, with bare aluminium showing through
-            repeat(if (wear > 1) 85 else 32) {
-                val side = rnd.nextInt(4)
-                val t = if (rnd.nextFloat() < 0.5f) (if (rnd.nextBoolean()) rnd.nextFloat() * 0.09f else 1f - rnd.nextFloat() * 0.09f) else rnd.nextFloat()
-                val inward = rnd.nextFloat() * 4f * d
-                val cx = when (side) { 0 -> t * w; 1 -> w - inward; 2 -> t * w; else -> inward }
-                val cy = when (side) { 0 -> inward; 1 -> t * h; 2 -> h - inward; else -> t * h }
-                val r = (1.2f + rnd.nextFloat() * 3.8f) * d
-                val p = Path()
-                val verts = 4 + rnd.nextInt(2)
-                for (i in 0 until verts) {
-                    val ang = (i / verts.toFloat()) * 2f * PI.toFloat() + rnd.nextFloat() * 0.6f
-                    val rr = r * (0.55f + rnd.nextFloat() * 0.7f)
-                    val px = cx + cos(ang) * rr
-                    val py = cy + sin(ang) * rr * 0.8f
-                    if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
-                }
-                p.close()
-                flecks.add(Fleck(p, 0.55f + rnd.nextFloat() * 0.4f))
-            }
-        }
-    }
-
-    /** Brushed metal, grain, uneven sheen, scratches, panel seams, bevel and screws. Drawn behind the controls. */
-    fun drawBase(s: DrawScope) = with(s) {
-        var y = 0f
-        var k = 0
-        while (y < h) { drawLine(if (k % 2 == 0) Color(0x0AFFFFFF) else Color(0x0A000000), Offset(0f, y), Offset(w, y), 1f); y += 2f; k++ }
-        drawPoints(grainLight, PointMode.Points, Color(0x14FFFFFF), 1.3f * d, StrokeCap.Round)
-        drawPoints(grainDark, PointMode.Points, Color(0x1A000000), 1.3f * d, StrokeCap.Round)
-        // uneven sheen: polished where hands rest, dull and dark elsewhere
-        drawRect(Brush.radialGradient(listOf(Color(if (wear > 0) 0x24FFFFFF else 0x12FFFFFF), Color.Transparent), Offset(w * 0.5f, h * 0.80f), w * 0.75f))
-        drawRect(Brush.radialGradient(listOf(Color(0x1CFFFFFF), Color.Transparent), Offset(w, h * 0.5f), w * 0.55f))
-        drawRect(Brush.radialGradient(listOf(Color(0x30000000), Color.Transparent), Offset(w * 0.1f, h * 0.25f), w * 0.6f))
-        for (l in scratches) drawLine(l.color, l.a, l.b, l.w, StrokeCap.Round)
-        // recessed panel lines: a dark groove with a thin bright edge under it
-        for (fy in listOf(0.105f, 0.60f, 0.93f)) {
-            drawLine(Color(0x99000000), Offset(0f, h * fy), Offset(w, h * fy), 1.5f * d)
-            drawLine(Color(0x22FFFFFF), Offset(0f, h * fy + 1.5f * d), Offset(w, h * fy + 1.5f * d), 1f * d)
-        }
-        drawRoundRect(
-            Brush.linearGradient(listOf(Color(0x66FFFFFF), Color.Transparent, Color(0x88000000)), Offset.Zero, Offset(w, h)),
-            Offset(d, d), Size(w - 2f * d, h - 2f * d), CornerRadius(10f * d), style = Stroke(2.5f * d),
-        )
-        screws.forEachIndexed { i, c -> drawScrew(c, 5.5f * d, 20f + i * 37f, wear) }
-    }
-
-    /** Chipped paint along the edges, drawn over everything. */
-    fun drawWear(s: DrawScope) = with(s) {
-        for (f in flecks) {
-            translate(0.8f * d, 0.8f * d) { drawPath(f.path, Color(0x66000000)) }
-            drawPath(f.path, Color(0xFFC3C7CE).copy(alpha = f.alpha))
-        }
-    }
-}
-
-/** A Phillips screw: a grime ring, a domed head, a cross slot at its own angle, and a dark rim. */
-private fun DrawScope.drawScrew(c: Offset, r: Float, angle: Float, wear: Int) {
-    if (wear > 0) drawCircle(Color(0x66000000), r * 1.35f, c)
-    drawCircle(Brush.radialGradient(listOf(Color(0xFFB8BBC0), Color(0xFF6B6E74)), Offset(c.x - r * 0.3f, c.y - r * 0.3f), r * 1.4f), r, c)
-    rotate(angle, c) {
-        drawLine(Color(0xFF2A2B2E), Offset(c.x - r * 0.7f, c.y), Offset(c.x + r * 0.7f, c.y), r * 0.28f)
-        drawLine(Color(0xFF2A2B2E), Offset(c.x, c.y - r * 0.7f), Offset(c.x, c.y + r * 0.7f), r * 0.28f)
-    }
-    drawCircle(Color(0x66000000), r, c, style = Stroke(r * 0.16f))
-}
-
-// ------------------------------------------------------------------ the cassette door
-
-private class DoorArt(size: Size, private val d: Float, private val wear: Int) {
-    private val w = size.width
-    private val h = size.height
-    private val wl = 14f * d
-    private val wt = 26f * d
-    private val ww = w - 28f * d
-    private val wh = h - 52f * d
-    private val dust = ArrayList<MDot>()
-
-    init {
-        if (wear > 0) {
-            val rnd = Random(7)
-            val perimeter = 2f * (ww + wh)
-            repeat(if (wear > 1) 150 else 60) {
-                val t = rnd.nextFloat() * perimeter
-                val out = rnd.nextFloat() * 6f * d
-                // dust and grime collect in the recess around the window
-                val p = when {
-                    t < ww -> Offset(wl + t, wt - out)
-                    t < ww + wh -> Offset(wl + ww + out, wt + (t - ww))
-                    t < 2f * ww + wh -> Offset(wl + ww - (t - ww - wh), wt + wh + out)
-                    else -> Offset(wl - out, wt + wh - (t - 2f * ww - wh))
-                }
-                dust += MDot(p, (0.5f + rnd.nextFloat() * 1.1f) * d, Color(0xFFC2B79B).copy(alpha = 0.18f + rnd.nextFloat() * 0.3f))
-            }
+        val rnd = Random(3)
+        repeat(260) {
+            val y = rnd.nextFloat() * h
+            val x = rnd.nextFloat() * w * 0.6f
+            val len = w * (0.3f + rnd.nextFloat() * 0.7f)
+            val c = if (rnd.nextFloat() < 0.65f) Color(0xFF000000) else Color(0xFF8A5A30)
+            grain.add(MLine(Offset(x, y), Offset(x + len, y + (rnd.nextFloat() - 0.5f) * 8f * d), c.copy(alpha = 0.04f + rnd.nextFloat() * 0.09f), (0.6f + rnd.nextFloat() * 1.8f) * d))
         }
     }
 
     fun draw(s: DrawScope) = with(s) {
-        drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF26282C), Color(0xFF191B1E))), Offset.Zero, Size(w, h), CornerRadius(10f * d))
-        drawRoundRect(
-            Brush.linearGradient(listOf(Color(0x55FFFFFF), Color.Transparent, Color(0x99000000)), Offset.Zero, Offset(w, h)),
-            Offset(d, d), Size(w - 2f * d, h - 2f * d), CornerRadius(10f * d), style = Stroke(2f * d),
-        )
-        drawRoundRect(Color(0xFF050506), Offset(wl - 3f * d, wt - 3f * d), Size(ww + 6f * d, wh + 6f * d), CornerRadius(9f * d))
-        drawRoundRect(Color(0x33FFFFFF), Offset(wl - 3f * d, wt - 3f * d), Size(ww + 6f * d, wh + 6f * d), CornerRadius(9f * d), style = Stroke(1f * d))
-        for (p in dust) drawCircle(p.color, p.r, p.c)
-        for (c in listOf(Offset(9f * d, 9f * d), Offset(w - 9f * d, 9f * d), Offset(9f * d, h - 9f * d), Offset(w - 9f * d, h - 9f * d))) drawScrew(c, 4.2f * d, c.x * 0.7f, wear)
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF2A1C12), Color(0xFF17100B), Color(0xFF110C08))), Offset.Zero, Size(w, h))
+        for (g in grain) drawLine(g.color, g.a, g.b, g.w, StrokeCap.Round)
+        drawRect(Brush.radialGradient(listOf(Color.Transparent, Color(0xAA000000)), Offset(w / 2f, h / 2f), max(w, h) * 0.75f), Offset.Zero, Size(w, h))
     }
 }
 
-@Composable
-private fun CassetteDoor(
-    st: SkinState, act: SkinActions, m: Motion, wear: Int, loaded: Boolean, spinning: Boolean,
-    progress: () -> Float, shown: () -> Float, insert: () -> Float, modifier: Modifier,
-) {
-    val uiDensity = LocalDensity.current
-    BoxWithConstraints(
-        modifier.drawWithCache {
-            val art = DoorArt(size, density, wear)
-            onDrawWithContent {
-                art.draw(this)
-                drawContent()
-            }
-        },
-    ) {
-        val winW = maxWidth - 28.dp
-        val winH = maxHeight - 52.dp
-        val cassW = minOf(winW * 0.92f, winH * 0.92f * CASSETTE_ASPECT)
-        val cassH = cassW / CASSETTE_ASPECT
-        val cassLX = (winW - cassW) / 2
-        val cassLY = (winH - cassH) / 2
-        val cassHPx = with(uiDensity) { cassH.toPx() }
-        val titleSp = with(uiDensity) { (cassH * 0.082f).toSp() }
-        val artistSp = with(uiDensity) { (cassH * 0.062f).toSp() }
+/** A soft shadow under a unit, built from a few translucent rounded rectangles. */
+private fun Modifier.unitShadow(): Modifier = this.drawBehind {
+    for (i in 1..6) {
+        val grow = i * 3.dp.toPx()
+        drawRoundRect(Color(0x14000000), Offset(-grow + 2.dp.toPx(), -grow + 7.dp.toPx() + i * 1.5.dp.toPx()), Size(size.width + 2 * grow - 4.dp.toPx(), size.height + 2 * grow), CornerRadius(14.dp.toPx() + grow))
+    }
+}
 
-        // the window: a cassette inside, and you can turn the tape by hand by dragging along it
-        Box(
-            Modifier.offset(14.dp, 26.dp).size(winW, winH).clip(RoundedCornerShape(6.dp)).background(Color(0xFF0B0B0D))
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { m.dragFrac = progress() },
-                        onDragEnd = { m.dragFrac?.let { f -> if (st.dur.longValue > 0) act.onSeekTo((f * st.dur.longValue).toLong()) }; m.dragFrac = null },
-                        onDragCancel = { m.dragFrac = null },
-                    ) { change, dx ->
-                        m.dragFrac = ((m.dragFrac ?: 0f) + dx / size.width).coerceIn(0f, 1f)
-                        m.scrubDir = if (dx >= 0) 1 else -1
-                        m.scrubAt = System.currentTimeMillis()
-                        change.consume()
-                    }
-                },
-        ) {
-            Canvas(Modifier.fillMaxSize()) {
-                val cw = cassW.toPx(); val ch = cassH.toPx()
-                val x = cassLX.toPx(); val y = cassLY.toPx()
-                if (loaded) {
-                    translate(top = (1f - insert()) * ch * 0.7f) {
-                        drawCassette(x, y, cw, ch, m.rotL.floatValue, m.rotR.floatValue, shown(), spinning, wear)
-                    }
-                }
-            }
-            if (loaded) {
-                // the writing sits in its own band on the label, above the reel window
-                Column(
-                    Modifier.offset(cassLX + cassW * 0.085f, cassLY + cassH * 0.145f).width(cassW * 0.83f).height(cassH * 0.20f)
-                        .graphicsLayer { translationY = (1f - insert()) * cassHPx * 0.7f },
-                ) {
-                    BasicText(
-                        st.ps.title, style = TextStyle(color = Color(0xFF1F356B), fontSize = titleSp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Cursive),
-                        maxLines = 1,
-                    )
-                    BasicText(
-                        st.ps.artist, style = TextStyle(color = Color(0xFF2B4380), fontSize = artistSp, fontFamily = FontFamily.Cursive),
-                        maxLines = 1,
-                    )
-                }
-            }
-            // aged plastic in front of everything: yellowing haze, dirt in the rim, glare, scuffs and dust
-            Box(
-                Modifier.fillMaxSize().drawWithCache {
-                    val marks = scatter(size.width, size.height, wear, 91, density, scratches = 12, dust = 80, smudges = 6, light = Color.White, dark = Color(0xFF3A3326), scratchLen = 0.26f)
-                    onDrawWithContent {
-                        drawRect(Color(if (wear > 0) 0x22E4C870 else 0x0A000000))
-                        if (wear > 0) {
-                            drawRect(Brush.radialGradient(listOf(Color.Transparent, Color(0x40C9A24A)), Offset(size.width / 2f, size.height / 2f), max(size.width, size.height) * 0.75f))
-                        }
-                        drawRoundRect(Color(0x66000000), Offset.Zero, size, CornerRadius(6.dp.toPx()), style = Stroke(8.dp.toPx()))
-                        drawRoundRect(Color(0x33000000), Offset(4.dp.toPx(), 4.dp.toPx()), Size(size.width - 8.dp.toPx(), size.height - 8.dp.toPx()), CornerRadius(5.dp.toPx()), style = Stroke(4.dp.toPx()))
-                        val glare = Path().apply {
-                            moveTo(size.width * 0.15f, 0f); lineTo(size.width * 0.35f, 0f); lineTo(size.width * 0.10f, size.height); lineTo(size.width * -0.10f, size.height); close()
-                        }
-                        drawPath(glare, Color(0x12FFFFFF))
-                        marks.draw(this)
-                    }
-                },
-            )
+// ------------------------------------------------------------------------------------------------------
+//  The front face
+// ------------------------------------------------------------------------------------------------------
+
+private class Streak(val u0: Float, val u1: Float, val v: Float, val color: Color, val w: Float)
+private class Fleck(val path: Path, val alpha: Float)
+
+/** Everything on the front face that does not move, generated once from fixed seeds so the player looks the same every time. */
+private class FrontArt {
+    private val grainLight = ArrayList<Offset>()
+    private val grainDark = ArrayList<Offset>()
+    private val streaks = ArrayList<Streak>()
+    private val scratches = ArrayList<MLine>()
+    private val rubs = ArrayList<MOval>()
+    private val grime = ArrayList<MDot>()
+    private val chips = ArrayList<Fleck>()
+    private val wornBand = ArrayList<MLine>()
+    private val wornBandDots = ArrayList<MDot>()
+    private val wornAbs = ArrayList<MDot>()
+    private val body: Path = Path().apply { addRoundRect(RoundRect(0f, 0f, FW, FH, 14f, 14f)) }
+
+    private val kanji = paintOf(INK_WHITE, 92f, Typeface.create(Typeface.DEFAULT, Typeface.BOLD))
+    private val boodo = paintOf(INK_BLUE, 38f, SANS_REG)
+    private val small = paintOf(INK_WHITE, 17f, SANS_MEDIUM)
+    private val label = paintOf(INK_WHITE, 22.5f, SANS_MEDIUM)
+    private val battery = paintOf(INK_WHITE, 21f, SANS_BOLD)
+    private val wordmark = paintOf(INK_WHITE, 70f, SERIF_BOLD)
+    private val dol = paintOf(INK_WHITE, 34f, SANS_BOLD)
+    private val onoff = paintOf(INK_WHITE, 17f, SANS_MEDIUM)
+    private val tiny = paintOf(INK_WHITE, 18.5f, SANS_BOLD)
+
+    init {
+        val rnd = Random(86)
+        repeat(2600) { grainLight.add(Offset(rnd.nextFloat() * FW, rnd.nextFloat() * FH)); grainDark.add(Offset(rnd.nextFloat() * FW, rnd.nextFloat() * FH)) }
+        // brushed streaks along the band, brighter towards its upper edge and fading out towards the lower seam
+        repeat(900) {
+            val v = -324f + rnd.nextFloat() * 450f
+            val fade = (1f - ((v + 324f) / 450f)).pow(1.3f)
+            val u0 = -700f + rnd.nextFloat() * 900f
+            val len = 70f + rnd.nextFloat() * 520f
+            val light = rnd.nextFloat() < 0.78f
+            streaks.add(Streak(u0, u0 + len, v, (if (light) Color.White else Color.Black).copy(alpha = (0.02f + rnd.nextFloat() * 0.13f) * (0.25f + fade)), 0.6f + rnd.nextFloat() * 1.4f))
         }
-        // printed lettering on the plate around the window
-        WornText("BUDOKAN", 11.sp, wear, 41, Modifier.align(Alignment.TopStart).padding(start = 16.dp, top = 7.dp), italic = true)
-        WornText("STEREO", 9.sp, wear, 42, Modifier.align(Alignment.TopEnd).padding(end = 16.dp, top = 9.dp), mono = true)
-        WornText("DIRECT DRIVE", 9.sp, wear, 43, Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 8.dp), mono = true)
-        WornText("NR", 9.sp, wear, 44, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 8.dp), mono = true)
+        // micro-scratches: denser in the lower half and on the right, where hands hold it; mostly across the grain
+        repeat(380) {
+            val gripped = rnd.nextFloat() < 0.65f
+            val y = if (gripped) FH * (0.45f + 0.55f * rnd.nextFloat().pow(0.7f)) else rnd.nextFloat() * FH
+            val x = if (gripped && rnd.nextBoolean()) FW * (0.6f + 0.4f * rnd.nextFloat()) else rnd.nextFloat() * FW
+            val a = if (rnd.nextFloat() < 0.7f) (rnd.nextFloat() - 0.5f) * 0.9f else rnd.nextFloat() * PI.toFloat()
+            val len = 6f + rnd.nextFloat() * 34f
+            scratches.add(MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), (if (rnd.nextFloat() < 0.75f) Color(0xFFD5D8DE) else Color.Black).copy(alpha = 0.06f + rnd.nextFloat() * 0.2f), 0.5f + rnd.nextFloat() * 0.7f))
+        }
+        repeat(10) {                                                  // a few long hairline scuffs
+            val x = rnd.nextFloat() * FW
+            val y = FH * (0.35f + rnd.nextFloat() * 0.6f)
+            val a = (rnd.nextFloat() - 0.5f) * 0.5f
+            val len = 80f + rnd.nextFloat() * 160f
+            scratches.add(MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), Color(0xFFD5D8DE).copy(alpha = 0.05f + rnd.nextFloat() * 0.07f), 0.8f))
+        }
+        // polished where thumbs rest: round the controls and in the lower right
+        for (c in listOf(ref(PLAY_UV.x, PLAY_UV.y), ref(STOP_UV.x, STOP_UV.y), Offset(640f, 930f), Offset(540f, 760f))) rubs.add(MOval(Offset(c.x - 90f, c.y - 70f), Size(180f, 140f), Color.White.copy(alpha = 0.035f)))
+        // dust and grime collected in the seams and around the controls
+        repeat(260) {
+            val onSeam = rnd.nextBoolean()
+            val u = -800f + rnd.nextFloat() * 1600f
+            val v = if (onSeam) (if (rnd.nextBoolean()) -324f else 118f) + (rnd.nextFloat() - 0.5f) * 9f else -320f + rnd.nextFloat() * 440f
+            val p = ref(u, v)
+            if (p.x in 8f..(FW - 8f) && p.y in 8f..(FH - 8f)) grime.add(MDot(p, 0.5f + rnd.nextFloat() * 1.3f, (if (rnd.nextFloat() < 0.6f) Color(0xFFC9C2AE) else Color.Black).copy(alpha = 0.12f + rnd.nextFloat() * 0.28f)))
+        }
+        // paint worn off the edges, corners and the ends of the seams, with bare aluminium showing through
+        repeat(110) {
+            val side = rnd.nextInt(4)
+            val t = if (rnd.nextFloat() < 0.5f) (if (rnd.nextBoolean()) rnd.nextFloat() * 0.09f else 1f - rnd.nextFloat() * 0.09f) else rnd.nextFloat()
+            val inward = rnd.nextFloat() * 5f
+            val cx = when (side) { 0 -> t * FW; 1 -> FW - inward; 2 -> t * FW; else -> inward }
+            val cy = when (side) { 0 -> inward; 1 -> t * FH; 2 -> FH - inward; else -> t * FH }
+            val r = 1.5f + rnd.nextFloat() * 4.5f
+            val p = Path()
+            val verts = 4 + rnd.nextInt(2)
+            for (i in 0 until verts) {
+                val ang = (i / verts.toFloat()) * 2f * PI.toFloat() + rnd.nextFloat() * 0.6f
+                val rr = r * (0.55f + rnd.nextFloat() * 0.7f)
+                val px = cx + cos(ang) * rr
+                val py = cy + sin(ang) * rr * 0.8f
+                if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
+            }
+            p.close()
+            chips.add(Fleck(p, 0.55f + rnd.nextFloat() * 0.4f))
+        }
+        // lettering worn away by thumbs: marks in the colour of the metal beneath, scattered over each printed area
+        fun wearBand(u0: Float, u1: Float, v0: Float, v1: Float, n: Int) {
+            repeat(n) {
+                val u = u0 + rnd.nextFloat() * (u1 - u0)
+                val v = v0 + rnd.nextFloat() * (v1 - v0)
+                val base = lumColor(shadeAt(v))
+                if (rnd.nextFloat() < 0.35f) {
+                    val a = rnd.nextFloat() * PI.toFloat()
+                    val len = 6f + rnd.nextFloat() * 20f
+                    wornBand.add(MLine(Offset(u, v), Offset(u + cos(a) * len, v + sin(a) * len), base.copy(alpha = 0.7f + rnd.nextFloat() * 0.25f), 0.9f + rnd.nextFloat() * 1.2f))
+                } else {
+                    wornBandDots.add(MDot(Offset(u, v), 0.6f + rnd.nextFloat() * 1.6f, base.copy(alpha = 0.6f + rnd.nextFloat() * 0.35f)))
+                }
+            }
+        }
+        wearBand(-240f, 35f, -139f, -51f, 60)          // the kanji
+        wearBand(-239f, 35f, -31f, -4f, 26)            // BOODO KHAN
+        wearBand(-455f, -143f, 14f, 46f, 90)           // the two small lines
+        wearBand(-133f, 37f, 12f, 45f, 24)             // the Dolby marks
+        wearBand(204f, 412f, -278f, -259f, 26)         // FF and REW labels
+        wearBand(111f, 169f, -162f, -148f, 12)         // PLAY label
+        wearBand(178f, 240f, -1f, 15f, 14)             // STOP label
+        wearBand(340f, 428f, -109f, -93f, 14)          // BATTERY
+        repeat(60) { wornAbs.add(MDot(Offset(50f + rnd.nextFloat() * 261f, 37f + rnd.nextFloat() * 49f), 0.7f + rnd.nextFloat() * 1.8f, lumColor(shadeAt(-480f)).copy(alpha = 0.6f + rnd.nextFloat() * 0.35f))) }   // the wordmark
+        repeat(30) { wornAbs.add(MDot(Offset(520f + rnd.nextFloat() * 75f, 1000f + rnd.nextFloat() * 24f), 0.7f + rnd.nextFloat() * 1.6f, Color(0xFF131311).copy(alpha = 0.7f + rnd.nextFloat() * 0.25f))) }   // DOL
+    }
+
+    fun draw(s: DrawScope, k: Float) = with(s) {
+        scale(k, k, Offset.Zero) {
+            clipPath(body) {
+                drawBase()
+                drawPrint()
+                drawHousings()
+                drawWear()
+            }
+            for (f in chips) {
+                translate(0.8f, 0.8f) { drawPath(f.path, Color(0x66000000)) }
+                drawPath(f.path, Color(0xFFC3C7CE).copy(alpha = f.alpha))
+            }
+        }
+    }
+
+    private fun DrawScope.drawBase() {
+        val n = Offset(SINA, COSA)
+        val centre = Offset(CX, CY)
+        val stops = SHADE.map { (v, l) -> ((v + 660f) / 1320f) to lumColor(l) }.toTypedArray()
+        drawRect(Brush.linearGradient(*stops, start = centre + n * -660f, end = centre + n * 660f), Offset.Zero, Size(FW, FH))
+        band {
+            for (st in streaks) drawLine(st.color, Offset(st.u0, st.v), Offset(st.u1, st.v), st.w)
+            // the two diagonal seams: a dark groove with a bright edge
+            drawLine(Color(0xAA000000), Offset(-900f, -324f), Offset(900f, -324f), 3f)
+            drawLine(Color(0x38FFFFFF), Offset(-900f, -327f), Offset(900f, -327f), 1.5f)
+            drawLine(Color(0xB3000000), Offset(-900f, 118f), Offset(900f, 118f), 3.5f)
+            drawLine(Color(0x24FFFFFF), Offset(-900f, 124f), Offset(900f, 124f), 1.5f)
+        }
+        // side walls, top and bottom strips
+        drawRect(Brush.horizontalGradient(listOf(lumColor(15f), lumColor(34f)), 0f, 26f), Offset.Zero, Size(26f, FH))
+        drawRect(Brush.horizontalGradient(listOf(lumColor(41f), lumColor(11f)), 740f, FW), Offset(740f, 0f), Size(FW - 740f, FH))
+        drawLine(Color(0x80000000), Offset(26f, 0f), Offset(26f, FH), 2f)
+        drawLine(Color(0x1FFFFFFF), Offset(28f, 0f), Offset(28f, FH), 1.5f)
+        drawLine(Color(0x80000000), Offset(740f, 0f), Offset(740f, FH), 2f)
+        drawRect(Brush.verticalGradient(listOf(lumColor(140f), lumColor(82f)), 0f, 30f), Offset.Zero, Size(FW, 30f))
+        drawLine(Color(0x8C000000), Offset(0f, 30f), Offset(FW, 30f), 2f)
+        drawLine(Color(0x4DFFFFFF), Offset(0f, 1.5f), Offset(FW, 1.5f), 2f)
+        drawRect(lumColor(12f), Offset(0f, 1044f), Size(FW, FH - 1044f))
+        drawLine(Color(0x99000000), Offset(0f, 1044f), Offset(FW, 1044f), 2f)
+        drawLine(Color(0x1AFFFFFF), Offset(0f, 1047f), Offset(FW, 1047f), 1.5f)
+        drawPoints(grainLight, PointMode.Points, Color(0x14FFFFFF), 1.3f, StrokeCap.Round)
+        drawPoints(grainDark, PointMode.Points, Color(0x1A000000), 1.3f, StrokeCap.Round)
+    }
+
+    /** All the printing. The Sony wordmark is the only thing that is not as the original has it: it reads VINA. */
+    private fun DrawScope.drawPrint() {
+        fitText("VINA", wordmark, 50f, 61.5f, 261f)
+        band {
+            fitText("武道館", kanji, -240f, -95f, 275f)
+            fitText("BOODO KHAN", boodo, -239f, -17.5f, 274f)
+            fitText("DISC DRIVE CAPSTAN SERVO", small, -430f, 22.5f, 287f)
+            fitText("DYNAMIC OPTIMUM LOUDNESS", small, -455f, 38.8f, 312f)
+            // Dolby double-D and the DOLBY NR box
+            drawDolbyD(-133f, 16f, 21f, 29f, true)
+            drawDolbyD(-109f, 16f, 21f, 29f, false)
+            drawRoundRect(INK_WHITE, Offset(-84f, 12f), Size(121f, 33f), CornerRadius(2f), style = Stroke(2.2f))
+            fitText("DOLBY NR", tiny, -73f, 28.8f, 100f)
+            // control labels
+            drawTriangle(204f, -268f, 19f, 16f, true); drawTriangle(222f, -268f, 19f, 16f, true)
+            fitText("FF", label, 251f, -268f, 30f)
+            fitText("REW", label, 308f, -268.5f, 54f)
+            drawTriangle(373f, -268.5f, 19f, 16f, false); drawTriangle(392f, -268.5f, 19f, 16f, false)
+            fitText("PLAY", label, 111.7f, -155f, 57f)
+            fitText("STOP", label, 178f, 7f, 62f)
+        }
+        // the DOL switch's printing, in absolute pixels
+        fitText("DOL", dol, 520f, 1012f, 75f)
+        fitText("ON", onoff, 547f, 938f, 28f)
+        fitText("OFF", onoff, 547f, 958f, 44f)
+        drawLine(INK_WHITE, Offset(595f, 938f), Offset(626f, 938f), 1.6f)
+        drawLine(INK_WHITE, Offset(595f, 958f), Offset(626f, 958f), 1.6f)
+    }
+
+    private fun DrawScope.drawTriangle(u: Float, v: Float, w: Float, h: Float, pointsLeft: Boolean) {
+        val p = Path().apply {
+            if (pointsLeft) { moveTo(u, v); lineTo(u + w, v - h / 2f); lineTo(u + w, v + h / 2f) } else { moveTo(u + w, v); lineTo(u, v - h / 2f); lineTo(u, v + h / 2f) }
+            close()
+        }
+        drawPath(p, INK_WHITE)
+    }
+
+    /** One half of the Dolby double-D: a solid D with a black D cut out of it. [mirrored] is the left one. */
+    private fun DrawScope.drawDolbyD(x: Float, y: Float, w: Float, h: Float, mirrored: Boolean) {
+        fun dShape(ix: Float, iy: Float, iw: Float, ih: Float): Path = Path().apply {
+            if (mirrored) {
+                moveTo(ix + iw, iy); lineTo(ix + ih / 2f, iy); arcTo(Rect(ix, iy, ix + ih, iy + ih), -90f, -180f, false); lineTo(ix + iw, iy + ih)
+            } else {
+                moveTo(ix, iy); lineTo(ix + iw - ih / 2f, iy); arcTo(Rect(ix + iw - ih, iy, ix + iw, iy + ih), -90f, 180f, false); lineTo(ix, iy + ih)
+            }
+            close()
+        }
+        drawPath(dShape(x, y, w, h), INK_WHITE)
+        drawPath(dShape(x + 3.2f, y + 3.2f, w - 6.4f, h - 6.4f), Color(0xFF121212))
+    }
+
+    /** Recesses and fixed parts of the controls: the gaskets round the keys, the PLAY slot, the battery window, the LED housing, the DOL slot. */
+    private fun DrawScope.drawHousings() {
+        for ((uv, r, cap) in listOf(Triple(REW_UV, 46f, 26f), Triple(FF_UV, 46f, 26f), Triple(STOP_UV, 59f, 36f))) {
+            val c = ref(uv.x, uv.y)
+            drawCircle(Color(0x33FFFFFF), r + 3.5f, c, style = Stroke(2.2f))                     // the faint bright edge outside the gasket
+            drawCircle(Color(0xFF050505), r, c)                                                  // the black outline
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF6C6D69), Color(0xFF4A4B48)), c, r), r - 7f, c)    // the grey floor of the recess
+            drawCircle(Color(0x66000000), r - 7f, c, style = Stroke(2f))
+            drawCircle(Color(0xFF0B0B0A), cap + 4.5f, c)                                         // the shadow round the cap
+        }
+        band {
+            // PLAY slot: the green ring is rounded at the left end and nearly square at the right
+            drawPath(pill(87f, -139f, 275f, -54f, 42f, 12f), GREEN_RING)
+            drawPath(pill(87f, -139f, 275f, -54f, 42f, 12f), Color(0x59FFFFFF), style = Stroke(1.5f))
+            drawPath(pill(99f, -127f, 263f, -66f, 30f, 3f), Color(0xFF030303))
+            // battery bar, its dark end block, and the LED's housing
+            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF626260), Color(0xFF2E2E2D)), -118f, -84f), Offset(277f, -118f), Size(180f, 34f), CornerRadius(5f))
+            drawRoundRect(Color(0x55000000), Offset(277f, -118f), Size(180f, 34f), CornerRadius(5f), style = Stroke(1.6f))
+            drawLine(Color(0x40FFFFFF), Offset(281f, -116.5f), Offset(453f, -116.5f), 1.4f)
+            drawRoundRect(Color(0xFF151515), Offset(446f, -118f), Size(24f, 34f), CornerRadius(4f))
+            drawCircle(Color(0xFF060606), 15.5f, Offset(LED_UV.x, LED_UV.y))
+            drawCircle(Color(0x59FFFFFF), 15.5f, Offset(LED_UV.x, LED_UV.y), style = Stroke(1.4f))
+            fitText("BATTERY", battery, 340f, -101f, 88f)
+        }
+        // DOL slot
+        drawRoundRect(Color(0xFF040404), Offset(608f, 904f), Size(140f, 146f), CornerRadius(6f))
+        drawRoundRect(Color(0x2EFFFFFF), Offset(608f, 904f), Size(140f, 146f), CornerRadius(6f), style = Stroke(1.5f))
+    }
+
+    private fun DrawScope.drawWear() {
+        for (r in rubs) drawOval(Brush.radialGradient(listOf(r.color, Color.Transparent), Offset(r.topLeft.x + r.size.width / 2f, r.topLeft.y + r.size.height / 2f), r.size.width / 2f), r.topLeft, r.size)
+        for (l in scratches) drawLine(l.color, l.a, l.b, l.w, StrokeCap.Round)
+        for (d in grime) drawCircle(d.color, d.r, d.c)
+        band {
+            for (l in wornBand) drawLine(l.color, l.a, l.b, l.w, StrokeCap.Round)
+            for (d in wornBandDots) drawCircle(d.color, d.r, d.c)
+        }
+        for (d in wornAbs) drawCircle(d.color, d.r, d.c)
     }
 }
 
-// ------------------------------------------------------------------ operation light
+/** A rounded slot, round at the left end and nearly square at the right, in the band frame. */
+private fun pill(l: Float, t: Float, r: Float, b: Float, left: Float, right: Float): Path =
+    Path().apply { addRoundRect(RoundRect(l, t, r, b, CornerRadius(left), CornerRadius(right), CornerRadius(right), CornerRadius(left))) }
 
-/** A small red lens that glows warmly while the tape runs, with a slight flicker like an old LED. */
-@Composable
-private fun Led(on: Boolean) {
-    val glow by animateFloatAsState(if (on) 1f else 0f, tween(400), label = "led")
-    val flicker by rememberInfiniteTransition(label = "flicker").animateFloat(
-        0.88f, 1f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "flickerValue",
+/** A round silver key as seen from above: dished cap, bright upper-left edge, and a little scuffing. [press] is 0 to 1. */
+private fun DrawScope.roundCap(c: Offset, r: Float, press: Float, mark: Boolean, seed: Int) {
+    val rr = r * (1f - 0.06f * press)
+    // the dished ring between the cap and the gasket, with a bright lower lip
+    drawCircle(Brush.radialGradient(listOf(Color(0xFF1B1B1A), Color(0xFF070707)), c, r + 5f), r + 4f, c)
+    drawArc(Color(0x66FFFFFF), 20f, 140f, false, Offset(c.x - r - 2f, c.y - r - 2f), Size(2f * r + 4f, 2f * r + 4f), style = Stroke(1.6f, cap = StrokeCap.Round))
+    drawCircle(
+        Brush.radialGradient(listOf(SILVER_TOP, SILVER_MID, SILVER_LOW, Color(0xFF6B6C68)), Offset(c.x - rr * 0.22f, c.y - rr * 0.28f), rr * 1.3f),
+        rr, c,
     )
-    Canvas(Modifier.size(34.dp)) {
-        val c = Offset(size.width / 2f, size.height / 2f)
-        val level = glow * flicker
-        if (glow > 0.01f) {
-            drawCircle(Brush.radialGradient(listOf(Color(0x66FF3B30), Color.Transparent), c, size.minDimension / 2f), size.minDimension / 2f, c, alpha = level)
+    drawArc(Color(0x99FFFFFF), 195f, 80f, false, Offset(c.x - rr * 0.82f, c.y - rr * 0.82f), Size(rr * 1.64f, rr * 1.64f), style = Stroke(rr * 0.09f, cap = StrokeCap.Round))
+    if (mark) drawRoundRect(Color(0x886C6C68), Offset(c.x - 11f, c.y - 11f), Size(22f, 22f), CornerRadius(4f), style = Stroke(2.4f))
+    // finger oil has dulled the centre a little; years of use have scratched the rest
+    drawOval(Brush.radialGradient(listOf(Color(0x22000000), Color.Transparent), c, rr * 0.6f), Offset(c.x - rr * 0.6f, c.y - rr * 0.5f), Size(rr * 1.2f, rr))
+    val rnd = Random(seed)
+    repeat(9) {
+        val a = rnd.nextFloat() * 6.283f
+        val d = rnd.nextFloat() * rr * 0.8f
+        val x = c.x + cos(a) * d
+        val y = c.y + sin(a) * d
+        val ang = rnd.nextFloat() * 3.1416f
+        val len = 3f + rnd.nextFloat() * 11f
+        drawLine((if (rnd.nextBoolean()) Color.White else Color.Black).copy(alpha = 0.10f + rnd.nextFloat() * 0.2f), Offset(x, y), Offset(x + cos(ang) * len, y + sin(ang) * len), 0.7f + rnd.nextFloat() * 0.8f)
+    }
+    if (press > 0f) drawCircle(Color.Black.copy(alpha = 0.22f * press), rr, c)
+}
+
+/** The PLAY slider: a pale silver cap in the green ring, with a green triangle pointing left. It sinks and darkens while the tape runs. */
+private fun DrawScope.playCap(press: Float) {
+    val sink = 1.5f * press
+    band {
+        val cap = pill(103f + sink, -121f + sink, 259f - sink, -70f - sink, 24f, 3f)
+        drawPath(cap, Brush.verticalGradient(listOf(Color(0xFFE6ECE8), Color(0xFFD2D5D0), Color(0xFFB9BAB5)), -121f, -70f))
+        drawPath(cap, Brush.horizontalGradient(listOf(Color(0x40000000), Color.Transparent), 103f, 150f))      // the tapered left end
+        drawPath(cap, Color(0x66000000), style = Stroke(1.2f))
+        drawRoundRect(Color(0x66FFFFFF), Offset(150f, -117f), Size(100f, 3f), CornerRadius(1.5f))
+        val tri = Path().apply { moveTo(167f, -94f); lineTo(197f, -104f); lineTo(197f, -84f); close() }
+        drawPath(tri, GREEN_RING)
+        val rnd = Random(77)
+        repeat(12) {
+            val x = 112f + rnd.nextFloat() * 140f
+            val y = -116f + rnd.nextFloat() * 40f
+            val len = 4f + rnd.nextFloat() * 16f
+            drawLine((if (rnd.nextBoolean()) Color.White else Color.Black).copy(alpha = 0.10f + rnd.nextFloat() * 0.2f), Offset(x, y), Offset(x + len, y + (rnd.nextFloat() - 0.5f) * 4f), 0.8f)
         }
-        drawCircle(Color(0xFF2A0A0A), 6.dp.toPx(), c)
-        drawCircle(lerp(Color(0xFF4A1210), Color(0xFFFF5A44), level), 4.5.dp.toPx(), c)
-        drawCircle(Color(0x66FFFFFF), 1.2.dp.toPx(), Offset(c.x - 1.5.dp.toPx(), c.y - 1.5.dp.toPx()))
+        if (press > 0f) drawPath(cap, Color.Black.copy(alpha = 0.2f * press))
     }
 }
 
-// ------------------------------------------------------------------ readout and tape position
-
-@Composable
-private fun LcdReadout(st: SkinState, wear: Int) {
-    Row(
-        Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(5.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFFC3CFB3), Color(0xFFAEBCA0))))
-            .border(2.dp, Color(0xFF0E0F11), RoundedCornerShape(5.dp))
-            .drawWithCache {
-                val marks = scatter(size.width, size.height, wear, 57, density, scratches = 6, dust = 40, smudges = 3, light = Color.White, dark = Color(0xFF3A4034), scratchLen = 0.2f)
-                onDrawWithContent {
-                    drawContent()
-                    if (wear > 0) drawRect(Color(0x1CE4C870))                         // the LCD's plastic has yellowed
-                    marks.draw(this)
-                }
-            }
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        SevenSeg(mmss(st.pos.longValue), LCD_INK, 13.dp, 28.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Marquee(st.ps.title.ifBlank { "VINA" }.uppercase(), LCD_INK, 13)
-            BasicText(
-                kbps(st) + " KBPS   " + khz(st) + " KHZ   " + st.ps.artist.uppercase(),
-                style = TextStyle(color = LCD_INK.copy(alpha = 0.75f), fontSize = 9.sp, fontFamily = MONO_W, fontWeight = FontWeight.Bold),
-                maxLines = 1, softWrap = false,
-            )
-        }
+/** The DOL slide switch: a ribbed silver block; the dark slit near its top lines up with ON when the loudness boost is on. */
+private fun DrawScope.dolCap(on: Float) {
+    val top = 925f - 10f * on
+    drawRoundRect(Brush.verticalGradient(listOf(SILVER_TOP, SILVER_MID, SILVER_LOW), top, top + 112f), Offset(613f, top), Size(129f, 112f), CornerRadius(5f))
+    drawRoundRect(Color(0x66000000), Offset(613f, top), Size(129f, 112f), CornerRadius(5f), style = Stroke(1.5f))
+    drawRoundRect(Color(0xFF3D3D3A), Offset(626f, top + 9f), Size(44f, 6f), CornerRadius(2f))
+    for (i in 0..7) {
+        val y = top + 44f + i * 8f
+        drawLine(Color(0x40000000), Offset(619f, y), Offset(736f, y), 2f)
+        drawLine(Color(0x99FFFFFF), Offset(619f, y + 2.5f), Offset(736f, y + 2.5f), 1.4f)
+    }
+    val rnd = Random(91)
+    repeat(14) {
+        val x = 618f + rnd.nextFloat() * 110f
+        val y = top + 6f + rnd.nextFloat() * 100f
+        drawLine((if (rnd.nextBoolean()) Color.White else Color.Black).copy(alpha = 0.10f + rnd.nextFloat() * 0.2f), Offset(x, y), Offset(x + 4f + rnd.nextFloat() * 14f, y + (rnd.nextFloat() - 0.5f) * 3f), 0.8f)
     }
 }
 
-/** A printed tape-position scale with a worn gold marker. Tap or drag to seek. */
-@Composable
-private fun TapeBar(st: SkinState, wear: Int, onSeek: (Long) -> Unit) {
-    var drag by remember { mutableStateOf<Float?>(null) }
-    val dur = st.dur.longValue
-    val frac = drag ?: if (dur > 0) (st.pos.longValue.toFloat() / dur).coerceIn(0f, 1f) else 0f
-    Box(
-        Modifier.fillMaxWidth().height(34.dp)
-            .pointerInput(dur) { detectTapGestures { o -> if (dur > 0) onSeek((o.x / size.width * dur).toLong()) } }
-            .pointerInput(dur) {
-                detectHorizontalDragGestures(
-                    onDragStart = { drag = (it.x / size.width).coerceIn(0f, 1f) },
-                    onDragEnd = { drag?.let { f -> if (dur > 0) onSeek((f * dur).toLong()) }; drag = null },
-                    onDragCancel = { drag = null },
-                ) { change, _ -> drag = (change.position.x / size.width).coerceIn(0f, 1f) }
-            },
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val gy = size.height * 0.62f
-            val gh = 8.dp.toPx()
-            drawRoundRect(Color(0xFF0C0D0F), Offset(0f, gy - gh / 2), Size(size.width, gh), CornerRadius(gh / 2))
-            drawRoundRect(Color(0x33FFFFFF), Offset(0f, gy - gh / 2), Size(size.width, gh), CornerRadius(gh / 2), style = Stroke(1.dp.toPx()))
-            drawRoundRect(Color(0xFFB8901C).copy(alpha = 0.85f), Offset(0f, gy - gh / 2), Size(size.width * frac, gh), CornerRadius(gh / 2))
-            for (i in 0..10) {                                               // the printed scale, a little faded
-                val x = size.width * i / 10f
-                drawLine(GOLD.copy(alpha = if (wear > 0) 0.45f else 0.8f), Offset(x, gy - gh / 2 - (if (i % 5 == 0) 9 else 5).dp.toPx()), Offset(x, gy - gh / 2 - 2.dp.toPx()), 1.dp.toPx())
-            }
-            val mx = (size.width * frac).coerceIn(4.dp.toPx(), size.width - 4.dp.toPx())
-            drawRoundRect(Color(0xFF3A2E08), Offset(mx - 4.dp.toPx(), gy - 12.dp.toPx()), Size(8.dp.toPx(), 24.dp.toPx()), CornerRadius(2.dp.toPx()))
-            drawRoundRect(GOLD.copy(alpha = if (wear > 0) 0.8f else 1f), Offset(mx - 3.dp.toPx(), gy - 11.dp.toPx()), Size(6.dp.toPx(), 22.dp.toPx()), CornerRadius(2.dp.toPx()))
-            drawLine(Color(0x88FFFFFF), Offset(mx, gy - 10.dp.toPx()), Offset(mx, gy + 10.dp.toPx()), 1.dp.toPx())
-        }
+private fun DrawScope.ledLens(level: Float) {
+    val c = ref(LED_UV.x, LED_UV.y)
+    if (level > 0.02f) drawCircle(Brush.radialGradient(listOf(Color(0x80FF3B30), Color.Transparent), c, 34f), 34f, c, alpha = level)
+    drawCircle(lerp(Color(0xFF5A1412), Color(0xFFFF5A44), level), 10f, c)
+    drawCircle(Color(0x80FFFFFF), 2.4f, Offset(c.x - 3f, c.y - 3.2f))
+}
+
+/** Which control a touch at reference pixel ([x], [y]) is on: 0 REW, 1 FF, 2 STOP, 3 PLAY, 4 DOL, or -1. */
+private fun hitTest(x: Float, y: Float): Int {
+    fun inCircle(uv: Offset, r: Float): Boolean { val c = ref(uv.x, uv.y); return (x - c.x) * (x - c.x) + (y - c.y) * (y - c.y) <= r * r }
+    val b = toBand(x, y)
+    return when {
+        inCircle(REW_UV, 54f) -> 0
+        inCircle(FF_UV, 54f) -> 1
+        inCircle(STOP_UV, 66f) -> 2
+        kotlin.math.abs(b.x - 181f) <= 104f && kotlin.math.abs(b.y + 96.5f) <= 50f -> 3
+        x in 600f..760f && y in 895f..1060f -> 4
+        else -> -1
     }
 }
 
-// ------------------------------------------------------------------ switches, wheel and keys
-
 @Composable
-private fun MiniSwitch(label: String, wear: Int, seed: Int, modifier: Modifier, onClick: () -> Unit) {
-    var down by remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
-    val slide by animateFloatAsState(if (down) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 800f), label = "switch")
-    Column(
-        modifier.pointerInput(Unit) {
-            detectTapGestures(
-                onPress = { down = true; tryAwaitRelease(); down = false },
-                onTap = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick() },
-            )
-        },
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Canvas(Modifier.size(width = 40.dp, height = 18.dp)) {
-            drawRoundRect(Color(0xFF08090A), Offset.Zero, size, CornerRadius(3.dp.toPx()))
-            drawRoundRect(Color(0x33FFFFFF), Offset.Zero, size, CornerRadius(3.dp.toPx()), style = Stroke(1.dp.toPx()))
-            val tabW = 16.dp.toPx()
-            val x = 3.dp.toPx() + slide * (size.width - tabW - 6.dp.toPx())
-            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF8B8F96), Color(0xFF4E5157))), Offset(x, 2.dp.toPx()), Size(tabW, size.height - 4.dp.toPx()), CornerRadius(2.dp.toPx()))
-            for (i in 0..2) drawLine(Color(0x66000000), Offset(x + 4.dp.toPx() + i * 3.dp.toPx(), 4.dp.toPx()), Offset(x + 4.dp.toPx() + i * 3.dp.toPx(), size.height - 4.dp.toPx()), 1.dp.toPx())
-        }
-        WornText(label, 7.sp, wear, seed, mono = true)
-    }
-}
-
-/** A thumb-wheel in the side of the case. The ridges scroll as you turn it, and are worn smooth where the thumb rests. */
-@Composable
-private fun VolumeWheel(volume: VolumeControl, wear: Int, modifier: Modifier) {
-    Box(
-        modifier.clip(RoundedCornerShape(8.dp))
-            .pointerInput(Unit) { detectVerticalDragGestures { change, dy -> volume.set((volume.level.value - dy / 260f).coerceIn(0f, 1f)); change.consume() } }
-            .drawWithCache {
-                val marks = scatter(size.width, size.height, wear, 63, density, scratches = 6, dust = 16, smudges = 2, light = Color.White, dark = Color.Black, scratchLen = 0.5f)
-                onDrawWithContent {
-                    drawContent()
-                    if (wear > 0) drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0x3AB0B4BA), Color.Transparent), size.height * 0.2f, size.height * 0.8f))
-                    marks.draw(this)
-                }
-            },
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawRoundRect(Color(0xFF0C0D0F), Offset.Zero, size, CornerRadius(8.dp.toPx()))
-            val inset = 3.dp.toPx()
-            drawRoundRect(
-                Brush.verticalGradient(listOf(Color(0xFF1A1B1E), Color(0xFF5A5D63), Color(0xFF8C9097), Color(0xFF5A5D63), Color(0xFF1A1B1E))),
-                Offset(inset, inset), Size(size.width - 2 * inset, size.height - 2 * inset), CornerRadius(6.dp.toPx()),
-            )
-            val spacing = 7.dp.toPx()
-            val offset = (volume.level.value * 420.dp.toPx()) % spacing
-            var y = inset - spacing + offset
-            while (y < size.height) {
-                if (y > inset && y < size.height - inset) {
-                    drawLine(Color(0x88000000), Offset(inset + 2.dp.toPx(), y), Offset(size.width - inset - 2.dp.toPx(), y), 2.dp.toPx())
-                    drawLine(Color(0x33FFFFFF), Offset(inset + 2.dp.toPx(), y + 2.dp.toPx()), Offset(size.width - inset - 2.dp.toPx(), y + 2.dp.toPx()), 1.dp.toPx())
-                }
-                y += spacing
-            }
-        }
-    }
-}
-
-/** A chunky key. It sinks when pressed, and stays down while its function is active. The cap is darkened and smoothed by finger oil. */
-@Composable
-private fun WmKey(
-    modifier: Modifier, latched: Boolean, silver: Boolean, wear: Int, seed: Int, repeatDir: Int = 0, onRepeat: (Int) -> Unit = {},
-    onTap: () -> Unit, content: @Composable BoxScope.() -> Unit,
+private fun FrontFace(
+    st: SkinState, act: SkinActions, m: Motion, playing: Boolean, dolOn: Boolean, onDol: () -> Unit, width: Dp,
 ) {
+    val height = width * (FH / FW)
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    val tap by rememberUpdatedState(onTap)
-    val repeatCb by rememberUpdatedState(onRepeat)
-    var down by remember { mutableStateOf(false) }
-    val depth by animateFloatAsState(if (latched || down) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 900f), label = "key")
+    val stNow by rememberUpdatedState(st)
+    val actNow by rememberUpdatedState(act)
+    val onDolNow by rememberUpdatedState(onDol)
+    var down by remember { mutableIntStateOf(-1) }
+    val keySpring = spring<Float>(dampingRatio = 0.6f, stiffness = 900f)
+    val rew by animateFloatAsState(if (down == 0) 1f else 0f, keySpring, label = "rew")
+    val ff by animateFloatAsState(if (down == 1) 1f else 0f, keySpring, label = "ff")
+    val stop by animateFloatAsState(if (down == 2) 1f else 0f, keySpring, label = "stop")
+    val play by animateFloatAsState(if (playing || down == 3) 1f else 0f, keySpring, label = "play")
+    val dol by animateFloatAsState(if (dolOn) 1f else 0f, keySpring, label = "dol")
+    val led by animateFloatAsState(if (playing) 1f else 0f, tween(450), label = "led")
+    val flick by rememberInfiniteTransition(label = "flick").animateFloat(
+        0.9f, 1f, infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Reverse), label = "flickValue",
+    )
+
     Box(
-        modifier.fillMaxHeight()
-            .graphicsLayer { translationY = depth * 5.dp.toPx() }
-            .pointerInput(repeatDir) {
-                detectTapGestures(
-                    onPress = {
-                        down = true
-                        var held = false
-                        val job = if (repeatDir != 0) scope.launch {
-                            delay(350)
-                            held = true
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            while (true) { repeatCb(repeatDir); delay(200) }
-                        } else null
-                        val released = tryAwaitRelease()
-                        job?.cancel()
-                        down = false
-                        if (repeatDir != 0 && released && !held) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); tap() }
-                    },
-                    onTap = { if (repeatDir == 0) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); tap() } },
-                )
-            }
+        Modifier.size(width, height).unitShadow()
             .drawWithCache {
-                val worn = scatter(size.width, size.height, wear, 400 + seed, density, scratches = 3, dust = 8, smudges = 0, light = if (silver) Color.White else Color(0xFFBFF5C8), dark = Color.Black, scratchLen = 0.3f)
+                val art = FrontArt()
                 onDrawWithContent {
-                    val r = 5.dp.toPx()
-                    val lip = 3.dp.toPx()
-                    val top = if (silver) Color(0xFFD9DBDF) else Color(0xFF39C957)
-                    val bottom = if (silver) Color(0xFF9A9EA5) else Color(0xFF1C8A33)
-                    drawRoundRect(Color(0xCC000000), Offset(0f, lip), size, CornerRadius(r))
-                    drawRoundRect(Brush.verticalGradient(listOf(top, bottom)), Offset.Zero, Size(size.width, size.height - lip), CornerRadius(r))
-                    drawRoundRect(Color(0x55FFFFFF), Offset(2.dp.toPx(), 2.dp.toPx()), Size(size.width - 4.dp.toPx(), 6.dp.toPx()), CornerRadius(3.dp.toPx()))
-                    drawRoundRect(Color(0x66000000), Offset.Zero, Size(size.width, size.height - lip), CornerRadius(r), style = Stroke(1.dp.toPx()))
-                    if (wear > 0) {
-                        // finger oil: the middle of the cap is smoothed and a little darker
-                        drawOval(
-                            Brush.radialGradient(listOf(Color(0x44000000), Color.Transparent), Offset(size.width / 2f, size.height * 0.45f), size.width * 0.45f),
-                            Offset(size.width * 0.12f, size.height * 0.12f), Size(size.width * 0.76f, size.height * 0.6f),
-                        )
-                    }
+                    art.draw(this, size.width / FW)
                     drawContent()
-                    worn.draw(this)
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = { o ->
+                        val k = size.width / FW
+                        val id = hitTest(o.x / k, o.y / k)
+                        if (id >= 0) {
+                            down = id
+                            var held = false
+                            val job = if (id == 0 || id == 1) scope.launch {
+                                delay(350)
+                                held = true
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val dir = if (id == 0) -1 else 1
+                                while (true) {
+                                    actNow.scrub(stNow, dir)
+                                    m.scrubDir = dir
+                                    m.scrubAt = System.currentTimeMillis()
+                                    delay(200)
+                                }
+                            } else null
+                            val released = tryAwaitRelease()
+                            job?.cancel()
+                            down = -1
+                            if (released) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                when (id) {
+                                    0 -> { if (!held) actNow.onPrev() }
+                                    1 -> { if (!held) actNow.onNext() }
+                                    2 -> { actNow.stop(stNow) }
+                                    3 -> { actNow.onToggle() }
+                                    else -> { onDolNow() }
+                                }
+                            }
+                        }
+                    },
+                )
+            },
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val k = size.width / FW
+            scale(k, k, Offset.Zero) {
+                val rc = ref(REW_UV.x, REW_UV.y)
+                val fc = ref(FF_UV.x, FF_UV.y)
+                val sc = ref(STOP_UV.x, STOP_UV.y)
+                roundCap(rc, 26f, rew, false, 11)
+                roundCap(fc, 26f, ff, false, 12)
+                roundCap(sc, 36f, stop, true, 13)
+                playCap(play)
+                dolCap(dol)
+                ledLens(led * flick)
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------
+//  The back: the cassette, lying horizontally
+// ------------------------------------------------------------------------------------------------------
+
+/**
+ * The cassette-door side, turned a quarter turn so the cassette lies horizontally and the lettering reads normally.
+ * Reference size 990 x 677. The window shows a cassette whose cream reels are cut off by the window edge, as on the real
+ * unit; its label strip carries the title where the cassette's own printing would be.
+ */
+private class BackArt {
+    private val scratches = ArrayList<MLine>()
+    private val grime = ArrayList<MDot>()
+    private val chips = ArrayList<Fleck>()
+    private val wornText = ArrayList<MDot>()
+    private val body: Path = Path().apply { addRoundRect(RoundRect(0f, 0f, BACK_W, BACK_H, 20f, 20f)) }
+    private val wordmark = paintOf(INK_WHITE, 56f, SERIF_BOLD)
+    private val model = paintOf(INK_WHITE, 25f, SANS_MEDIUM)
+
+    init {
+        val rnd = Random(40)
+        repeat(300) {
+            val x = rnd.nextFloat() * BACK_W
+            val y = rnd.nextFloat() * BACK_H
+            val a = if (rnd.nextFloat() < 0.7f) (rnd.nextFloat() - 0.5f) * 0.6f else rnd.nextFloat() * PI.toFloat()
+            val len = 8f + rnd.nextFloat() * 44f
+            scratches.add(MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), (if (rnd.nextFloat() < 0.75f) Color(0xFFD5D8DE) else Color.Black).copy(alpha = 0.06f + rnd.nextFloat() * 0.18f), 0.6f + rnd.nextFloat() * 0.8f))
+        }
+        repeat(220) {
+            val onRim = rnd.nextFloat() < 0.6f
+            val p = if (onRim) { val t = rnd.nextFloat() * 2f * (680f + 260f); rimPoint(t, rnd) } else Offset(rnd.nextFloat() * BACK_W, rnd.nextFloat() * BACK_H)
+            grime.add(MDot(p, 0.6f + rnd.nextFloat() * 1.4f, (if (rnd.nextFloat() < 0.6f) Color(0xFFC9C2AE) else Color.Black).copy(alpha = 0.12f + rnd.nextFloat() * 0.28f)))
+        }
+        repeat(90) {
+            val side = rnd.nextInt(4)
+            val t = if (rnd.nextFloat() < 0.5f) (if (rnd.nextBoolean()) rnd.nextFloat() * 0.08f else 1f - rnd.nextFloat() * 0.08f) else rnd.nextFloat()
+            val inward = rnd.nextFloat() * 6f
+            val cx = when (side) { 0 -> t * BACK_W; 1 -> BACK_W - inward; 2 -> t * BACK_W; else -> inward }
+            val cy = when (side) { 0 -> inward; 1 -> t * BACK_H; 2 -> BACK_H - inward; else -> t * BACK_H }
+            val r = 2f + rnd.nextFloat() * 5f
+            val p = Path()
+            val verts = 4 + rnd.nextInt(2)
+            for (i in 0 until verts) {
+                val ang = (i / verts.toFloat()) * 2f * PI.toFloat() + rnd.nextFloat() * 0.6f
+                val rr = r * (0.55f + rnd.nextFloat() * 0.7f)
+                val px = cx + cos(ang) * rr
+                val py = cy + sin(ang) * rr * 0.8f
+                if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
+            }
+            p.close()
+            chips.add(Fleck(p, 0.55f + rnd.nextFloat() * 0.4f))
+        }
+        repeat(50) { wornText.add(MDot(Offset(395f + rnd.nextFloat() * 180f, 575f + rnd.nextFloat() * 50f), 0.7f + rnd.nextFloat() * 1.8f, Color(0xFF151515).copy(alpha = 0.6f + rnd.nextFloat() * 0.35f))) }
+        repeat(60) { wornText.add(MDot(Offset(285f + rnd.nextFloat() * 400f, 538f + rnd.nextFloat() * 24f), 0.7f + rnd.nextFloat() * 1.5f, Color(0xFF151515).copy(alpha = 0.6f + rnd.nextFloat() * 0.35f))) }
+        repeat(40) { wornText.add(MDot(Offset(415f + rnd.nextFloat() * 160f, 400f + rnd.nextFloat() * 74f), 0.7f + rnd.nextFloat() * 1.6f, Color(0xFF151515).copy(alpha = 0.5f + rnd.nextFloat() * 0.3f))) }
+    }
+
+    private fun rimPoint(t0: Float, rnd: Random): Offset {
+        // a point just outside the window rectangle (160..840 x 100..360), walking round its perimeter
+        val ww = 680f
+        val wh = 260f
+        val t = t0 % (2f * (ww + wh))
+        val out = rnd.nextFloat() * 7f
+        return when {
+            t < ww -> Offset(160f + t, 100f - out)
+            t < ww + wh -> Offset(840f + out, 100f + (t - ww))
+            t < 2f * ww + wh -> Offset(840f - (t - ww - wh), 360f + out)
+            else -> Offset(160f - out, 360f - (t - 2f * ww - wh))
+        }
+    }
+
+    fun draw(s: DrawScope, k: Float) = with(s) {
+        scale(k, k, Offset.Zero) {
+            clipPath(body) {
+                drawRect(Brush.verticalGradient(listOf(lumColor(40f), lumColor(22f), lumColor(15f)), 0f, BACK_H), Offset.Zero, Size(BACK_W, BACK_H))
+                var y = 0f
+                var i = 0
+                while (y < BACK_H) { drawLine(if (i % 2 == 0) Color(0x0AFFFFFF) else Color(0x0A000000), Offset(0f, y), Offset(BACK_W, y), 1f); y += 2.2f; i++ }
+                drawRect(Brush.verticalGradient(listOf(lumColor(125f), lumColor(62f)), 0f, 20f), Offset.Zero, Size(BACK_W, 20f))      // the thick edge of the case, seen from behind
+                drawLine(Color(0x99000000), Offset(0f, 20f), Offset(BACK_W, 20f), 2f)
+                drawRect(Brush.radialGradient(listOf(Color(0x1CFFFFFF), Color.Transparent), Offset(BACK_W * 0.35f, BACK_H * 0.8f), BACK_W * 0.6f), Offset.Zero, Size(BACK_W, BACK_H))
+                // the window: a recess with a clear plastic rim
+                drawRoundRect(Color(0xFF020203), Offset(150f, 90f), Size(700f, 280f), CornerRadius(48f))
+                drawRoundRect(Color(0x55FFFFFF), Offset(150f, 90f), Size(700f, 280f), CornerRadius(48f), style = Stroke(2.5f))
+                // lettering and the insertion arrow
+                fitText("VINA", wordmark, 395f, 600f, 180f)
+                fitText("STEREO CASSETTE PLAYER DD-100", model, 285f, 550f, 400f)
+                val arrow = Path().apply {
+                    moveTo(415f, 423f); lineTo(515f, 423f); lineTo(515f, 402f); lineTo(575f, 437f); lineTo(515f, 472f); lineTo(515f, 451f); lineTo(415f, 451f); close()
+                }
+                drawPath(arrow, INK_WHITE.copy(alpha = 0.92f), style = Stroke(5f, join = StrokeJoin.Round))
+                drawCircle(Color(0x66FFFFFF), 8f, Offset(420f, 645f), style = Stroke(2.5f))
+                for (l in scratches) drawLine(l.color, l.a, l.b, l.w, StrokeCap.Round)
+                for (d in grime) drawCircle(d.color, d.r, d.c)
+                for (d in wornText) drawCircle(d.color, d.r, d.c)
+            }
+            for (f in chips) {
+                translate(0.8f, 0.8f) { drawPath(f.path, Color(0x66000000)) }
+                drawPath(f.path, Color(0xFFC3C7CE).copy(alpha = f.alpha))
+            }
+        }
+    }
+}
+
+/** The reels: cream flanges with ten holes round the edge, a toothed hub, a spindle. Whether a hole shows tape depends on how full the reel is. */
+private fun DrawScope.reel(c: Offset, rot: Float, pack: Float) {
+    drawCircle(Color(0xFF14110F), 96f, c)
+    drawCircle(Color(0xFFE9DDBE), 90f, c)
+    drawCircle(Color(0x33000000), 90f, c, style = Stroke(3f))
+    rotate(rot, c) {
+        for (i in 0 until 10) {
+            val a = i * (2f * PI.toFloat() / 10f)
+            val hc = Offset(c.x + cos(a) * 68f, c.y + sin(a) * 68f)
+            drawCircle(if (pack > 68f) Color(0xFF4A3524) else Color(0xFF16130F), 11f, hc)       // brown where tape is behind the hole
+        }
+        drawCircle(Color(0xFFD2C7A7), 44f, c)
+        drawCircle(Color(0xFF1B1916), 30f, c)
+        for (i in 0 until 6) {
+            val a = i * (PI.toFloat() / 3f)
+            drawLine(Color(0xFFE9DDBE), Offset(c.x + cos(a) * 24f, c.y + sin(a) * 24f), Offset(c.x + cos(a) * 36f, c.y + sin(a) * 36f), 8f, StrokeCap.Round)
+        }
+        drawCircle(Color(0xFF7A7C80), 13f, c)
+        drawLine(Color(0xFF2B2C2F), Offset(c.x - 9f, c.y), Offset(c.x + 9f, c.y), 3f)
+        drawLine(Color(0xFF2B2C2F), Offset(c.x, c.y - 9f), Offset(c.x, c.y + 9f), 3f)
+    }
+}
+
+@Composable
+private fun BackPanel(
+    st: SkinState, m: Motion, loaded: Boolean, spinning: Boolean, shown: () -> Float, insert: () -> Float, act: SkinActions, width: Dp,
+) {
+    val height = width * (BACK_H / BACK_W)
+    val titlePaint = remember { paintOf(Color(0xFFEDE9DD), 28f, SANS_MEDIUM) }
+    val subPaint = remember { paintOf(Color(0xFFB9B4A6), 20f, SANS_REG) }
+    Box(
+        Modifier.size(width, height).unitShadow()
+            .drawWithCache {
+                val art = BackArt()
+                onDrawWithContent {
+                    art.draw(this, size.width / BACK_W)
+                    drawContent()
+                }
+            }
+            .pointerInput(Unit) {
+                // turning the tape by hand: drag along the window to seek
+                detectHorizontalDragGestures(
+                    onDragStart = { m.dragFrac = shown() },
+                    onDragEnd = { m.dragFrac?.let { f -> if (st.dur.longValue > 0) act.onSeekTo((f * st.dur.longValue).toLong()) }; m.dragFrac = null },
+                    onDragCancel = { m.dragFrac = null },
+                ) { change, dx ->
+                    m.dragFrac = ((m.dragFrac ?: 0f) + dx / size.width * 1.6f).coerceIn(0f, 1f)
+                    m.scrubDir = if (dx >= 0) 1 else -1
+                    m.scrubAt = System.currentTimeMillis()
+                    change.consume()
                 }
             },
-        contentAlignment = Alignment.Center, content = content,
-    )
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val k = size.width / BACK_W
+            scale(k, k, Offset.Zero) {
+                val win = Path().apply { addRoundRect(RoundRect(160f, 100f, 840f, 360f, 40f, 40f)) }
+                clipPath(win) {
+                    drawRect(Color(0xFF0B0B0C), Offset(160f, 100f), Size(680f, 260f))
+                    // the cassette slides in from the left each time a song starts
+                    translate(left = -(1f - insert()) * 520f) {
+                        if (loaded) {
+                            val p = shown()
+                            drawRect(Color(0xFF1B1A19), Offset(160f, 100f), Size(680f, 260f))
+                            drawRect(Color(0xFF2A2724), Offset(160f, 100f), Size(680f, 100f))                      // the label strip
+                            for (i in 0..9) drawLine(Color(0x40FFFFFF), Offset(402f + i * 20f, 218f), Offset(402f + i * 20f, 348f), 1.4f)   // the ruled lines between the reels
+                            drawRect(Color(0xFFE29A1E), Offset(288f, 156f), Size(15f, 34f))                           // the orange tab
+                            val leftPack = 48f + 36f * (1f - p)
+                            val rightPack = 48f + 36f * p
+                            reel(Offset(300f, 295f), m.rotL.floatValue, leftPack)
+                            reel(Offset(680f, 295f), m.rotR.floatValue, rightPack)
+                            val nc = drawContext.canvas.nativeCanvas
+                            var title = st.ps.title
+                            while (title.length > 3 && titlePaint.measureText(title) > 400f) title = title.dropLast(2)
+                            if (title != st.ps.title) title = title.trimEnd() + "…"
+                            nc.drawText(title, 270f, 150f, titlePaint)
+                            nc.drawText(st.ps.artist.take(46), 270f, 182f, subPaint)
+                        }
+                    }
+                    // clear plastic: a little yellowed, hazy, with its own scratches
+                    drawRect(Color(0x1CE4C870), Offset(160f, 100f), Size(680f, 260f))
+                    drawRect(Brush.linearGradient(listOf(Color(0x30FFFFFF), Color.Transparent, Color(0x10FFFFFF)), Offset(160f, 100f), Offset(840f, 360f)), Offset(160f, 100f), Size(680f, 260f))
+                    val rnd = Random(55)
+                    repeat(16) {
+                        val x = 170f + rnd.nextFloat() * 660f
+                        val y = 108f + rnd.nextFloat() * 245f
+                        val a = (rnd.nextFloat() - 0.5f) * 1.2f
+                        val len = 10f + rnd.nextFloat() * 60f
+                        drawLine(Color.White.copy(alpha = 0.10f + rnd.nextFloat() * 0.25f), Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), 0.8f + rnd.nextFloat())
+                    }
+                    repeat(90) { drawCircle(Color(0xFFC9C2AE).copy(alpha = 0.08f + rnd.nextFloat() * 0.2f), 0.6f + rnd.nextFloat() * 1.3f, Offset(165f + rnd.nextFloat() * 670f, 105f + rnd.nextFloat() * 250f)) }
+                    drawRoundRect(Color(0x66000000), Offset(160f, 100f), Size(680f, 260f), CornerRadius(40f), style = Stroke(12f))        // dirt in the rim
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------
+//  The top edge: headphone jacks and the volume wheel
+// ------------------------------------------------------------------------------------------------------
+
+private class StripArt {
+    private val scratches = ArrayList<MLine>()
+    private val grime = ArrayList<MDot>()
+    private val body: Path = Path().apply { addRoundRect(RoundRect(0f, 0f, STRIP_W, STRIP_H, 24f, 24f)) }
+    private val text = paintOf(INK_WHITE, 25f, SANS_BOLD)
+    private val big = paintOf(Color(0x66FFFFFF), 120f, SANS_BOLD)
+
+    init {
+        val rnd = Random(12)
+        repeat(160) {
+            val x = rnd.nextFloat() * STRIP_W
+            val y = rnd.nextFloat() * STRIP_H
+            val a = (rnd.nextFloat() - 0.5f) * 0.5f
+            val len = 10f + rnd.nextFloat() * 50f
+            scratches.add(MLine(Offset(x, y), Offset(x + cos(a) * len, y + sin(a) * len), (if (rnd.nextFloat() < 0.7f) Color(0xFFD5D8DE) else Color.Black).copy(alpha = 0.06f + rnd.nextFloat() * 0.18f), 0.6f + rnd.nextFloat() * 0.8f))
+        }
+        repeat(140) { grime.add(MDot(Offset(rnd.nextFloat() * STRIP_W, rnd.nextFloat() * STRIP_H), 0.6f + rnd.nextFloat() * 1.3f, (if (rnd.nextFloat() < 0.6f) Color(0xFFC9C2AE) else Color.Black).copy(alpha = 0.12f + rnd.nextFloat() * 0.26f))) }
+    }
+
+    fun draw(s: DrawScope, k: Float) = with(s) {
+        scale(k, k, Offset.Zero) {
+            clipPath(body) {
+                drawRect(Brush.verticalGradient(listOf(lumColor(82f), lumColor(40f), lumColor(22f)), 0f, STRIP_H), Offset.Zero, Size(STRIP_W, STRIP_H))
+                var y = 0f
+                var i = 0
+                while (y < 240f) { drawLine(if (i % 2 == 0) Color(0x14FFFFFF) else Color(0x14000000), Offset(0f, y), Offset(STRIP_W, y), 1.4f); y += 3f; i++ }
+                drawLine(Color(0x99000000), Offset(0f, 245f), Offset(STRIP_W, 245f), 2.5f)
+                drawLine(Color(0x33FFFFFF), Offset(0f, 249f), Offset(STRIP_W, 249f), 1.5f)
+                // the lower plate with the embossed STEREO and the dark recess
+                fitText("STEREO.", big, 40f, 305f, 330f)
+                drawRoundRect(Color(0xCC000000), Offset(640f, 268f), Size(300f, 62f), CornerRadius(10f))
+                // headphone jacks A and B
+                for ((cx, name) in listOf(240f to "A", 400f to "B")) {
+                    val c = Offset(cx, 135f)
+                    drawCircle(Color(0xFF050505), 40f, c)
+                    drawCircle(Brush.radialGradient(listOf(Color(0xFFF1F1EE), Color(0xFF9C9C98), Color(0xFF4E4E4A)), c, 38f), 34f, c)
+                    drawCircle(Color(0xFF9FCDB8), 34f, c, style = Stroke(3f))
+                    drawCircle(Color(0xFF0A0A0A), 19f, c)
+                    drawCircle(Color(0xFF8A8A86), 7f, c)
+                    fitText(name, text, cx, 205f, null, center = true)
+                }
+                fitText("HEADPHONES", text, 320f, 232f, 230f, center = true)
+                // the wedge that shows the volume rising, and the word VOLUME
+                val wedge = Path().apply { moveTo(650f, 66f); lineTo(930f, 66f); lineTo(930f, 32f); close() }
+                drawPath(wedge, INK_WHITE.copy(alpha = 0.9f), style = Stroke(3f, join = StrokeJoin.Round))
+                fitText("VOLUME", text, 790f, 232f, 150f, center = true)
+                for (l in scratches) drawLine(l.color, l.a, l.b, l.w, StrokeCap.Round)
+                for (d in grime) drawCircle(d.color, d.r, d.c)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopStrip(volume: VolumeControl, width: Dp) {
+    val height = width * (STRIP_H / STRIP_W)
+    Box(
+        Modifier.size(width, height).unitShadow()
+            .drawWithCache {
+                val art = StripArt()
+                onDrawWithContent {
+                    art.draw(this, size.width / STRIP_W)
+                    drawContent()
+                }
+            }
+            .pointerInput(Unit) {
+                // the wheel: drag along it to turn it, which sets the phone's media volume
+                detectHorizontalDragGestures { change, dx ->
+                    volume.set((volume.level.value + dx / size.width * 2.2f).coerceIn(0f, 1f))
+                    change.consume()
+                }
+            },
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val k = size.width / STRIP_W
+            scale(k, k, Offset.Zero) {
+                // the ribbed wheel in its recess
+                drawRoundRect(Color(0xFF040404), Offset(640f, 78f), Size(300f, 136f), CornerRadius(12f))
+                clipRect(646f, 84f, 934f, 208f) {
+                    drawRect(Brush.horizontalGradient(listOf(Color(0xFF1A1A18), Color(0xFF6B6B66), Color(0xFF9A9A94), Color(0xFF6B6B66), Color(0xFF1A1A18)), 646f, 934f), Offset(646f, 84f), Size(288f, 124f))
+                    val spacing = 13f
+                    val shift = (volume.level.value * 520f) % spacing
+                    var x = 646f - spacing + shift
+                    while (x < 934f) {
+                        drawLine(Color(0x99000000), Offset(x, 90f), Offset(x, 204f), 3f)
+                        drawLine(Color(0x44FFFFFF), Offset(x + 3.5f, 90f), Offset(x + 3.5f, 204f), 1.5f)
+                        x += spacing
+                    }
+                    drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color(0x2EB0B4BA), Color.Transparent), 700f, 880f), Offset(646f, 84f), Size(288f, 124f))
+                }
+                drawRoundRect(Color(0x33FFFFFF), Offset(640f, 78f), Size(300f, 136f), CornerRadius(12f), style = Stroke(2f))
+                // a marker showing the current level along the wedge
+                val mx = 650f + volume.level.value * 280f
+                drawLine(Color(0xCCE2B01E), Offset(mx, 28f), Offset(mx, 74f), 4f, StrokeCap.Round)
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------
+//  The row of Vina's own controls, printed like the rest of the lettering
+// ------------------------------------------------------------------------------------------------------
+
+@Composable
+private fun ActionRow(st: SkinState, act: SkinActions, width: Dp) {
+    val haptic = LocalHapticFeedback.current
+    Row(Modifier.width(width).height(34.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        BasicText(
+            mmss(st.pos.longValue) + " / " + mmss(st.dur.longValue),
+            style = TextStyle(color = Color(0xFFD9D4C6), fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold),
+        )
+        for ((name, action) in listOf("EQ" to act.onEq, "LYRICS" to act.onLyrics, "QUEUE" to act.onQueue, "MENU" to act.onMenu, "EJECT" to act.onClose)) {
+            Box(
+                Modifier.height(34.dp).pointerInput(name) {
+                    detectTapGestures(onTap = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); action() })
+                }.padding(horizontal = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                BasicText(name, style = TextStyle(color = Color(0xFFE9E5D8), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
+            }
+        }
+    }
 }
